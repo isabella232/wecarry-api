@@ -726,7 +726,7 @@ func (ms *ModelSuite) TestPost_Update() {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			err := test.post.Update()
+			err := test.post.Update(testContext(ms.DB))
 			if test.wantErr != "" {
 				ms.Error(err)
 				ms.Contains(err.Error(), test.wantErr, "unexpected error message")
@@ -1130,6 +1130,7 @@ func (ms *ModelSuite) TestPost_FindByUserAndUUID() {
 
 func (ms *ModelSuite) TestPost_GetSetDestination() {
 	t := ms.T()
+	ctx := testContext(ms.DB)
 
 	user := User{Uuid: domain.GetUuid(), Email: t.Name() + "_user@example.com", Nickname: t.Name() + "_User"}
 	createFixture(ms, &user)
@@ -1156,10 +1157,10 @@ func (ms *ModelSuite) TestPost_GetSetDestination() {
 	post := Post{CreatedByID: user.ID, OrganizationID: organization.ID, DestinationID: locations[0].ID}
 	createFixture(ms, &post)
 
-	err := post.SetDestination(locations[1])
+	err := post.SetDestination(ctx, locations[1])
 	ms.NoError(err, "unexpected error from post.SetDestination()")
 
-	locationFromDB, err := post.GetDestination()
+	locationFromDB, err := post.GetDestination(ctx)
 	ms.NoError(err, "unexpected error from post.GetDestination()")
 	locations[1].ID = locationFromDB.ID
 	ms.Equal(locations[1], *locationFromDB, "destination data doesn't match after update")

@@ -108,7 +108,8 @@ func (r *postResolver) Destination(ctx context.Context, obj *models.Post) (*mode
 		return nil, nil
 	}
 
-	destination, err := obj.GetDestination()
+	bc := models.GetBuffaloContextFromGqlContext(ctx)
+	destination, err := obj.GetDestination(bc)
 	if err != nil {
 		return nil, reportError(ctx, err, "GetPostDestination")
 	}
@@ -390,20 +391,21 @@ func (r *mutationResolver) UpdatePost(ctx context.Context, input postInput) (*mo
 
 	var dbPost models.Post
 	_ = dbPost.FindByID(post.ID)
-	if editable, err2 := dbPost.IsEditable(cUser); err2 != nil {
-		return nil, reportError(ctx, err2, "UpdatePost.GetEditable", extras)
+	if editable, err := dbPost.IsEditable(cUser); err != nil {
+		return nil, reportError(ctx, err, "UpdatePost.GetEditable", extras)
 	} else if !editable {
 		return nil, reportError(ctx, errors.New("attempt to update a non-editable post"),
 			"UpdatePost.NotEditable", extras)
 	}
 
-	if err3 := post.Update(); err3 != nil {
-		return nil, reportError(ctx, err3, "UpdatePost", extras)
+	bc := models.GetBuffaloContextFromGqlContext(ctx)
+	if err := post.Update(bc); err != nil {
+		return nil, reportError(ctx, err, "UpdatePost", extras)
 	}
 
 	if input.Destination != nil {
-		if err4 := post.SetDestination(convertGqlLocationInputToDBLocation(*input.Destination)); err4 != nil {
-			return nil, reportError(ctx, err4, "UpdatePost.SetDestination", extras)
+		if err := post.SetDestination(bc, convertGqlLocationInputToDBLocation(*input.Destination)); err != nil {
+			return nil, reportError(ctx, err, "UpdatePost.SetDestination", extras)
 		}
 	}
 
@@ -434,8 +436,9 @@ func (r *mutationResolver) UpdatePostStatus(ctx context.Context, input UpdatePos
 			"UpdatePostStatus.NotAllowed", extras)
 	}
 
+	bc := models.GetBuffaloContextFromGqlContext(ctx)
 	post.SetProviderWithStatus(input.Status, cUser)
-	if err := post.Update(); err != nil {
+	if err := post.Update(bc); err != nil {
 		return nil, reportError(ctx, err, "UpdatePostStatus", extras)
 	}
 

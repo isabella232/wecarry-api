@@ -183,8 +183,13 @@ func (p *Post) Create() error {
 }
 
 // Update writes the Post data to an existing database record.
-func (p *Post) Update() error {
-	valErrs, err := DB.ValidateAndUpdate(p)
+func (p *Post) Update(ctx context.Context) error {
+	tx, ok := ctx.Value("tx").(*pop.Connection)
+	if !ok {
+		return errors.New("no transaction found")
+	}
+
+	valErrs, err := tx.ValidateAndUpdate(p)
 	if err != nil {
 		return err
 	}
@@ -606,9 +611,14 @@ func (p *Posts) FindByUser(ctx context.Context, user User) error {
 }
 
 // GetDestination reads the destination record, if it exists, and returns the Location object.
-func (p *Post) GetDestination() (*Location, error) {
+func (p *Post) GetDestination(ctx context.Context) (*Location, error) {
+	tx, ok := ctx.Value("tx").(*pop.Connection)
+	if !ok {
+		return nil, errors.New("no transaction found")
+	}
+
 	location := Location{}
-	if err := DB.Find(&location, p.DestinationID); err != nil {
+	if err := tx.Find(&location, p.DestinationID); err != nil {
 		return nil, err
 	}
 
@@ -629,10 +639,25 @@ func (p *Post) GetOrigin() (*Location, error) {
 }
 
 // SetDestination sets the destination location fields, creating a new record in the database if necessary.
-func (p *Post) SetDestination(location Location) error {
+func (p *Post) SetDestination(ctx context.Context, location Location) error {
+	tx, ok := ctx.Value("tx").(*pop.Connection)
+	if !ok {
+		return errors.New("no transaction found")
+	}
+
 	location.ID = p.DestinationID
 	p.Destination = location
-	return DB.Update(&p.Destination)
+	valErrs, err := tx.ValidateAndUpdate(&p.Destination)
+	if err != nil {
+		return err
+	}
+
+	if len(valErrs.Errors) > 0 {
+		vErrs := FlattenPopErrors(valErrs)
+		return errors.New(vErrs)
+	}
+
+	return nil
 }
 
 // SetOrigin sets the origin location fields, creating a new record in the database if necessary.
