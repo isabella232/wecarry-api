@@ -87,13 +87,13 @@ func (ms *ModelSuite) TestUser_FindOrCreateFromAuthUser() {
 				ms.Error(err, "FindOrCreateFromAuthUser() did not return expected error")
 			} else {
 				ms.NoError(err, "FindOrCreateFromAuthUser() error: %s", err)
-				ms.NotEqual(0, u.ID, "Did not get a new user ID")
+				ms.True(u.ID != 0, "Did not get a new user ID")
 			}
 		})
 	}
 }
 
-func (ms *ModelSuite) TestValidateUser() {
+func (ms *ModelSuite) TestUser_Validate() {
 	t := ms.T()
 	tests := []struct {
 		name     string
@@ -170,39 +170,39 @@ func (ms *ModelSuite) TestValidateUser() {
 		{
 			name: "good photoURL",
 			user: User{
-				Email:     "user@example.com",
-				FirstName: "A",
-				LastName:  "User",
-				Nickname:  "A User",
-				Uuid:      domain.GetUuid(),
-				PhotoURL:  nulls.NewString("http://example.com/user/7/avatar"),
+				Email:        "user@example.com",
+				FirstName:    "A",
+				LastName:     "User",
+				Nickname:     "A User",
+				Uuid:         domain.GetUuid(),
+				AuthPhotoURL: nulls.NewString("http://example.com/user/7/avatar"),
 			},
 			wantErr: false,
 		},
 		{
 			name: "blank photoURL",
 			user: User{
-				Email:     "user@example.com",
-				FirstName: "A",
-				LastName:  "User",
-				Nickname:  "A User",
-				Uuid:      domain.GetUuid(),
-				PhotoURL:  nulls.NewString(""),
+				Email:        "user@example.com",
+				FirstName:    "A",
+				LastName:     "User",
+				Nickname:     "A User",
+				Uuid:         domain.GetUuid(),
+				AuthPhotoURL: nulls.NewString(""),
 			},
 			wantErr: false,
 		},
 		{
-			name: "bad photoURL",
+			name: "bad authPhotoURL",
 			user: User{
-				Email:     "user@example.com",
-				FirstName: "A",
-				LastName:  "User",
-				Nickname:  "A User",
-				Uuid:      domain.GetUuid(),
-				PhotoURL:  nulls.NewString("badone"),
+				Email:        "user@example.com",
+				FirstName:    "A",
+				LastName:     "User",
+				Nickname:     "A User",
+				Uuid:         domain.GetUuid(),
+				AuthPhotoURL: nulls.NewString("badone"),
 			},
 			wantErr:  true,
-			errField: "photo_url",
+			errField: "auth_photo_url",
 		},
 	}
 	for _, test := range tests {
@@ -222,7 +222,7 @@ func (ms *ModelSuite) TestValidateUser() {
 }
 
 // Ensure multiple access tokens for same organization are allowed (to support multiple tabs/browsers)
-func (ms *ModelSuite) TestCreateAccessToken() {
+func (ms *ModelSuite) TestUser_CreateAccessToken() {
 	t := ms.T()
 
 	orgs, users, _ := CreateUserFixtures(ms, t)
@@ -357,7 +357,7 @@ func (ms *ModelSuite) TestUser_GetOrganizations() {
 	}
 }
 
-func (ms *ModelSuite) Test_FindUserOrganization() {
+func (ms *ModelSuite) TestUser_FindUserOrganization() {
 	t := ms.T()
 	createUserOrganizationFixtures(ms, t)
 
@@ -485,6 +485,28 @@ func (ms *ModelSuite) TestUser_GetPosts() {
 				t.Errorf("GetOrgIDs() = \"%v\", want \"%v\"", ids, test.want)
 			}
 		})
+	}
+}
+
+func (ms *ModelSuite) TestUser_CanCreateOrganization() {
+	t := ms.T()
+
+	user := User{AdminRole: UserAdminRoleUser}
+	admin := User{AdminRole: UserAdminRoleAdmin}
+	salesAdmin := User{AdminRole: UserAdminRoleSalesAdmin}
+	superAdmin := User{AdminRole: UserAdminRoleSuperAdmin}
+
+	if !salesAdmin.CanCreateOrganization() {
+		t.Error("sales admin should be able to create orgs")
+	}
+	if !superAdmin.CanCreateOrganization() {
+		t.Error("super admin should be able to create orgs")
+	}
+	if admin.CanCreateOrganization() {
+		t.Error("admin should not be able to create orgs")
+	}
+	if user.CanCreateOrganization() {
+		t.Error("user should not be able to create orgs")
 	}
 }
 
@@ -617,6 +639,78 @@ func (ms *ModelSuite) TestUser_CanUpdatePostStatus() {
 	}
 }
 
+func (ms *ModelSuite) TestUser_FindByUUID() {
+	t := ms.T()
+
+	f := createFixturesForUserFind(ms)
+
+	tests := []struct {
+		name    string
+		UUID    string
+		wantErr string
+	}{
+		{
+			name:    "Good",
+			UUID:    f.Users[0].Uuid.String(),
+			wantErr: "",
+		},
+		{
+			name:    "Bad",
+			UUID:    "",
+			wantErr: "uuid must not be blank",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var u User
+			err := u.FindByUUID(test.UUID)
+			if test.wantErr != "" {
+				ms.Error(err)
+				ms.Contains(err.Error(), test.wantErr)
+				return
+			}
+			ms.Equal(test.UUID, u.Uuid.String())
+		})
+	}
+}
+
+func (ms *ModelSuite) TestUser_FindByID() {
+	t := ms.T()
+
+	f := createFixturesForUserFind(ms)
+
+	tests := []struct {
+		name    string
+		ID      int
+		wantErr string
+	}{
+		{
+			name:    "Good",
+			ID:      f.Users[0].ID,
+			wantErr: "",
+		},
+		{
+			name:    "Bad",
+			ID:      0,
+			wantErr: "id must be a positive number",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var u User
+			err := u.FindByID(test.ID)
+			if test.wantErr != "" {
+				ms.Error(err)
+				ms.Contains(err.Error(), test.wantErr)
+				return
+			}
+			ms.Equal(test.ID, u.ID)
+		})
+	}
+}
+
 func (ms *ModelSuite) TestUser_AttachPhoto() {
 	t := ms.T()
 
@@ -635,8 +729,8 @@ func (ms *ModelSuite) TestUser_AttachPhoto() {
 		t.Errorf("failed to attach photo to user, %s", err)
 	} else {
 		ms.Equal(filename, attachedFile.Name)
-		ms.NotEqual(0, attachedFile.ID)
-		ms.NotEqual(domain.EmptyUUID, attachedFile.UUID.String())
+		ms.True(attachedFile.ID != 0)
+		ms.True(attachedFile.UUID.Version() != 0)
 	}
 
 	if err := ms.DB.Load(&user); err != nil {
@@ -646,33 +740,120 @@ func (ms *ModelSuite) TestUser_AttachPhoto() {
 	ms.Equal(filename, user.PhotoFile.Name)
 
 	if got, err := user.GetPhotoURL(); err == nil {
-		ms.Regexp("^https?", got)
+		ms.NotNil(got)
+		ms.Regexp("^https?", *got)
 	} else {
 		ms.Fail("user.GetPhotoURL failed, %s", err)
 	}
 }
 
-func CreateUserFixturesForNicknames(ms *ModelSuite, t *testing.T) User {
-	prefix := allPrefixes()[0]
+func (ms *ModelSuite) TestUser_GetPhoto() {
+	t := ms.T()
+	f := createFixturesForTestUserGetPhoto(ms)
 
-	// Load User test fixtures
-	user := User{
-		Email:     fmt.Sprintf("user1-%s@example.com", t.Name()),
-		FirstName: "Existing",
-		LastName:  "User",
-		Nickname:  prefix + "ExistingU",
-		Uuid:      domain.GetUuid(),
+	tests := []struct {
+		name    string
+		user    User
+		wantURL string
+		wantNil bool
+		wantErr string
+	}{
+		{
+			name:    "no AuthPhoto, no photo attachment",
+			user:    f.Users[0],
+			wantNil: true,
+		},
+		{
+			name:    "AuthPhoto, and no photo attachment",
+			user:    f.Users[1],
+			wantURL: f.Users[1].AuthPhotoURL.String,
+		},
+		{
+			name:    "no AuthPhoto, but photo attachment",
+			user:    f.Users[2],
+			wantURL: f.Users[2].PhotoFile.URL,
+		},
+		{
+			name:    "AuthPhoto and photo attachment",
+			user:    f.Users[3],
+			wantURL: f.Users[3].PhotoFile.URL,
+		},
 	}
 
-	if err := ms.DB.Create(&user); err != nil {
-		t.Errorf("could not create test user %v ... %v", user, err)
-		t.FailNow()
-	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			url, err := test.user.GetPhotoURL()
+			if test.wantErr != "" {
+				ms.Error(err)
+				ms.Contains(err.Error(), test.wantErr, "unexpected error message")
+				return
+			}
+			ms.NoError(err)
 
-	return user
+			if test.wantNil {
+				ms.Nil(url)
+				return
+			}
+			ms.NotNil(url)
+			ms.Equal(test.wantURL, *url)
+		})
+	}
 }
 
-func (ms *ModelSuite) TestUniquifyNickname() {
+func (ms *ModelSuite) TestUser_Save() {
+	t := ms.T()
+	f := createFixturesForTestUserSave(ms)
+
+	tests := []struct {
+		name    string
+		user    User
+		wantErr string
+	}{
+		{
+			name:    "no uuid",
+			user:    f.Users[0],
+			wantErr: "",
+		},
+		{
+			name:    "no uuid, should not conflict with first",
+			user:    f.Users[1],
+			wantErr: "",
+		},
+		{
+			name:    "uuid given",
+			user:    f.Users[2],
+			wantErr: "",
+		},
+		{
+			name:    "update existing",
+			user:    f.Users[3],
+			wantErr: "",
+		},
+		{
+			name:    "validation error",
+			user:    f.Users[4],
+			wantErr: "first_name: FirstName can not be blank.",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := test.user.Save()
+			if test.wantErr != "" {
+				ms.Error(err)
+				ms.Contains(err.Error(), test.wantErr, "unexpected error message")
+				return
+			}
+			ms.NoError(err)
+
+			ms.True(test.user.Uuid.Version() != 0)
+			var u User
+			ms.NoError(u.FindByID(test.user.ID))
+		})
+	}
+}
+
+func (ms *ModelSuite) TestUser_UniquifyNickname() {
 	t := ms.T()
 	existingUser := CreateUserFixturesForNicknames(ms, t)
 	prefix := allPrefixes()[0]
@@ -718,7 +899,7 @@ func (ms *ModelSuite) TestUniquifyNickname() {
 				return
 			}
 
-			ms.NotEqual(test.dontWant, got)
+			ms.True(test.dontWant != got)
 		})
 	}
 }
@@ -898,6 +1079,116 @@ func (ms *ModelSuite) TestUser_WantsPostNotification() {
 	}
 }
 
+func (ms *ModelSuite) TestUser_UpdateStandardPreferences() {
+	t := ms.T()
+
+	f := CreateUserFixtures_TestGetPreference(ms)
+
+	tests := []struct {
+		name   string
+		user   User
+		SPrefs StandardPreferences
+		want   StandardPreferences
+	}{
+		{
+			name: "Change Lang, Leave KG, Add TimeZone",
+			user: f.Users[0],
+			SPrefs: StandardPreferences{
+				Language:   domain.UserPreferenceLanguageFrench,
+				WeightUnit: domain.UserPreferenceWeightUnitKGs,
+				TimeZone:   "America/New_York",
+			},
+			want: StandardPreferences{
+				Language:   domain.UserPreferenceLanguageFrench,
+				WeightUnit: domain.UserPreferenceWeightUnitKGs,
+				TimeZone:   "America/New_York",
+			},
+		},
+		{
+			name: "Start with none then add one",
+			user: f.Users[1],
+			SPrefs: StandardPreferences{
+				Language: domain.UserPreferenceLanguageFrench,
+			},
+			want: StandardPreferences{
+				Language: domain.UserPreferenceLanguageFrench,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := test.user.UpdateStandardPreferences(test.SPrefs)
+			ms.NoError(err)
+
+			ms.Equal(test.want, got, "incorrect result from UpdateStandardPreferences()")
+		})
+	}
+}
+
+func (ms *ModelSuite) TestUser_UpdatePreferenceByKey() {
+	t := ms.T()
+
+	f := CreateUserFixtures_TestGetPreference(ms)
+
+	tests := []struct {
+		name  string
+		user  User
+		key   string
+		value string
+		want  UserPreference
+	}{
+		{
+			name:  "Change Lang to French",
+			user:  f.Users[0],
+			key:   domain.UserPreferenceKeyLanguage,
+			value: domain.UserPreferenceLanguageFrench,
+			want: UserPreference{
+				ID:     f.UserPreferences[0].ID,
+				UserID: f.Users[0].ID,
+				Key:    domain.UserPreferenceKeyLanguage,
+				Value:  domain.UserPreferenceLanguageFrench,
+			},
+		},
+		{
+			name:  "Leave KGs unchanged",
+			user:  f.Users[0],
+			key:   domain.UserPreferenceKeyWeightUnit,
+			value: domain.UserPreferenceWeightUnitKGs,
+			want: UserPreference{
+				ID:     f.UserPreferences[1].ID,
+				UserID: f.Users[0].ID,
+				Key:    domain.UserPreferenceKeyWeightUnit,
+				Value:  domain.UserPreferenceWeightUnitKGs,
+			},
+		},
+		{
+			name:  "Add French",
+			user:  f.Users[1],
+			key:   domain.UserPreferenceKeyLanguage,
+			value: domain.UserPreferenceLanguageFrench,
+			want: UserPreference{
+				UserID: f.Users[1].ID,
+				Key:    domain.UserPreferenceKeyLanguage,
+				Value:  domain.UserPreferenceLanguageFrench,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := test.user.updatePreferenceByKey(test.key, test.value)
+			ms.NoError(err)
+
+			if test.want.ID > 0 {
+				ms.Equal(test.want.ID, got.ID, "incorrect ID result from updatePreferenceByKey()")
+			} else {
+				ms.Greater(got.ID, 0, "non-positive ID from updatePreferenceByKey()")
+			}
+			ms.Equal(test.want.Key, got.Key, "incorrect key result from updatePreferenceByKey()")
+			ms.Equal(test.want.Value, got.Value, "incorrect value result for "+test.want.Key)
+		})
+	}
+}
+
 func (ms *ModelSuite) TestUser_GetPreferences() {
 	t := ms.T()
 
@@ -906,101 +1197,28 @@ func (ms *ModelSuite) TestUser_GetPreferences() {
 	tests := []struct {
 		name string
 		user User
-		want []string // Preference Keys
+		want StandardPreferences
 	}{
-		{name: "has some", user: f.Users[0], want: []string{f.UserPreferences[0].Key, f.UserPreferences[1].Key}},
-		{name: "has none", user: f.Users[1], want: []string{}},
+		{
+			name: "english and kgs",
+			user: f.Users[0],
+			want: StandardPreferences{
+				Language:   domain.UserPreferenceLanguageEnglish,
+				WeightUnit: domain.UserPreferenceWeightUnitKGs,
+			},
+		},
+		{
+			name: "none",
+			user: f.Users[1],
+			want: StandardPreferences{},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			got, err := test.user.GetPreferences()
 			ms.NoError(err)
-			ms.Equal(len(test.want), len(got))
 
-			ms.NotNil(got)
-			gotKeys := []string{}
-			for _, g := range got {
-				gotKeys = append(gotKeys, g.Key)
-			}
-
-			ms.Equal(test.want, gotKeys, "incorrect result from GetPreferences()")
-		})
-	}
-}
-
-func (ms *ModelSuite) TestUser_GetPreference() {
-	t := ms.T()
-
-	f := CreateUserFixtures_TestGetPreference(ms)
-
-	tests := []struct {
-		name          string
-		user          User
-		preferenceKey string
-		wantNil       bool
-		want          string
-	}{
-		{name: "exists1", user: f.Users[0], preferenceKey: f.UserPreferences[1].Key, want: f.UserPreferences[1].Value},
-		{name: "not exists1", user: f.Users[0], preferenceKey: "Missing", wantNil: true},
-		{name: "not exists2", user: f.Users[1], preferenceKey: "Missing", wantNil: true},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			got, err := test.user.GetPreference(test.preferenceKey)
-			ms.NoError(err)
-			if test.wantNil {
-				ms.Nil(got, "Expected nil but got a preference")
-				return
-			}
-
-			ms.NotNil(got, "Got nil when expecting preference with Value "+test.want)
-			ms.Equal(test.want, got.Value, "incorrect result from GetPreference()")
-		})
-	}
-}
-
-func (ms *ModelSuite) TestUser_UpdatePreferencesByKey() {
-	t := ms.T()
-
-	f := CreateUserFixtures_TestGetPreference(ms)
-
-	tests := []struct {
-		name          string
-		user          User
-		preferenceKey string
-		newValue      string
-		wantCount     int
-		want          []string
-	}{
-		{
-			name:          "exists1",
-			user:          f.Users[0],
-			preferenceKey: f.UserPreferences[1].Key,
-			newValue:      "Updated1",
-			wantCount:     len(f.UserPreferences),
-			want:          []string{f.UserPreferences[0].Value, "Updated1"},
-		},
-		{
-			name:          "new preference",
-			user:          f.Users[0],
-			preferenceKey: "NewKey",
-			newValue:      "NewValue",
-			wantCount:     len(f.UserPreferences) + 1,
-			want:          []string{f.UserPreferences[0].Value, "Updated1", "NewValue"},
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			got, err := test.user.UpdatePreferencesByKey([][2]string{{test.preferenceKey, test.newValue}})
-			ms.NoError(err)
-			ms.Equal(test.wantCount, len(got), "incorrect number of user preferences")
-
-			gotVals := []string{}
-			for _, p := range got {
-				gotVals = append(gotVals, p.Value)
-			}
-
-			ms.Equal(test.want, gotVals, "incorrect result from UpdatePreferencesByKey()")
+			ms.Equal(test.want, got, "incorrect result from GetPreferences()")
 		})
 	}
 }

@@ -4,14 +4,20 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/silinternational/wecarry-api/domain"
 	"time"
 
 	"github.com/gobuffalo/pop"
 	"github.com/gobuffalo/validate"
 	"github.com/gobuffalo/validate/validators"
 	"github.com/gofrs/uuid"
+	"github.com/silinternational/wecarry-api/domain"
 )
+
+type StandardPreferences struct {
+	Language   string `json:"language"`
+	TimeZone   string `json:"time_zone"`
+	WeightUnit string `json:"weight_unit"`
+}
 
 type UserPreference struct {
 	ID        int       `json:"id" db:"id"`
@@ -63,12 +69,12 @@ func (p *UserPreference) ValidateUpdate(tx *pop.Connection) (*validate.Errors, e
 }
 
 // FindByUUID loads from DB the UserPreference record identified by the given UUID
-func (p *UserPreference) FindByUUID(id string, selectFields ...string) error {
+func (p *UserPreference) FindByUUID(id string) error {
 	if id == "" {
 		return errors.New("error: user preference uuid must not be blank")
 	}
 
-	if err := DB.Where("uuid = ?", id).Select(selectFields...).First(p); err != nil {
+	if err := DB.Where("uuid = ?", id).First(p); err != nil {
 		return fmt.Errorf("error finding user preference by uuid: %s", err.Error())
 	}
 
@@ -77,7 +83,7 @@ func (p *UserPreference) FindByUUID(id string, selectFields ...string) error {
 
 // Save wraps DB.Save() call to create a UUID if it's empty and check for errors
 func (p *UserPreference) Save() error {
-	if p.Uuid.String() == domain.EmptyUUID {
+	if p.Uuid.Version() == 0 {
 		p.Uuid = domain.GetUuid()
 	}
 

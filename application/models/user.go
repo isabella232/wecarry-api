@@ -1,11 +1,9 @@
 package models
 
 import (
-	"crypto/md5"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/gobuffalo/events"
@@ -59,7 +57,7 @@ type User struct {
 	AdminRole         UserAdminRole     `json:"admin_role" db:"admin_role"`
 	Uuid              uuid.UUID         `json:"uuid" db:"uuid"`
 	PhotoFileID       nulls.Int         `json:"photo_file_id" db:"photo_file_id"`
-	PhotoURL          nulls.String      `json:"photo_url" db:"photo_url"`
+	AuthPhotoURL      nulls.String      `json:"auth_photo_url" db:"auth_photo_url"`
 	LocationID        nulls.Int         `json:"location_id" db:"location_id"`
 	AccessTokens      []UserAccessToken `has_many:"user_access_tokens" json:"-"`
 	Organizations     Organizations     `many_to_many:"user_organizations" order_by:"name asc" json:"-"`
@@ -96,7 +94,7 @@ func (u *User) Validate(tx *pop.Connection) (*validate.Errors, error) {
 		&validators.StringIsPresent{Field: u.LastName, Name: "LastName"},
 		&validators.StringIsPresent{Field: u.Nickname, Name: "Nickname"},
 		&validators.UUIDIsPresent{Field: u.Uuid, Name: "Uuid"},
-		&NullsStringIsURL{Field: u.PhotoURL, Name: "PhotoURL"},
+		&NullsStringIsURL{Field: u.AuthPhotoURL, Name: "AuthPhotoURL"},
 	), nil
 }
 
@@ -113,10 +111,8 @@ func (u *User) ValidateUpdate(tx *pop.Connection) (*validate.Errors, error) {
 }
 
 // All retrieves all Users from the database.
-func (u *Users) All(selectFields ...string) error {
-	return DB.Select(selectFields...).
-		Order("nickname asc").
-		All(u)
+func (u *Users) All() error {
+	return DB.Order("nickname asc").All(u)
 }
 
 // CreateAccessToken - Create and store new UserAccessToken
@@ -192,11 +188,7 @@ func (u *User) FindOrCreateFromAuthUser(orgID int, authUser *auth.User) error {
 	u.Email = authUser.Email
 
 	if authUser.PhotoURL != "" {
-		u.PhotoURL = nulls.NewString(authUser.PhotoURL)
-	} else {
-		// ref: https://en.gravatar.com/site/implement/images/
-		hash := md5.Sum([]byte(strings.ToLower(strings.TrimSpace(authUser.Email))))
-		u.PhotoURL = nulls.NewString(fmt.Sprintf("https://www.gravatar.com/avatar/%x.jpg?s=200&d=mp", hash))
+		u.AuthPhotoURL = nulls.NewString(authUser.PhotoURL)
 	}
 
 	// if new user they will need a uuid and a unique Nickname
@@ -289,12 +281,12 @@ func (u *User) CanUpdatePostStatus(post Post, newStatus PostStatus) bool {
 }
 
 // FindByUUID find a User with the given UUID and loads it from the database.
-func (u *User) FindByUUID(uuid string, selectFields ...string) error {
+func (u *User) FindByUUID(uuid string) error {
 	if uuid == "" {
 		return errors.New("error: uuid must not be blank")
 	}
 
-	if err := DB.Select(selectFields...).Where("uuid = ?", uuid).First(u); err != nil {
+	if err := DB.Where("uuid = ?", uuid).First(u); err != nil {
 		return fmt.Errorf("error finding user by uuid: %s", err.Error())
 	}
 
@@ -303,7 +295,7 @@ func (u *User) FindByUUID(uuid string, selectFields ...string) error {
 
 func (u *User) FindByID(id int, eagerFields ...string) error {
 	if id <= 0 {
-		return errors.New("error finding user: id must a positive number")
+		return errors.New("error finding user: id must be a positive number")
 	}
 
 	if err := DB.Eager(eagerFields...).Find(u, id); err != nil {
@@ -370,27 +362,30 @@ func (u *User) AttachPhoto(fileID string) (File, error) {
 	return f, nil
 }
 
-// GetPhotoURL retrieves the photo URL, either from the photo_url database field, or from the attached file
-func (u *User) GetPhotoURL() (string, error) {
+// GetPhotoURL retrieves the photo URL from the attached file
+func (u *User) GetPhotoURL() (*string, error) {
 	if err := DB.Load(u, "PhotoFile"); err != nil {
-		return "", err
+		return nil, err
 	}
 
-	url := u.PhotoURL.String
-	if url == "" {
-		if !u.PhotoFileID.Valid {
-			return "", nil
+	if !u.PhotoFileID.Valid {
+		if u.AuthPhotoURL.Valid {
+			return &u.AuthPhotoURL.String, nil
 		}
-		if err := u.PhotoFile.RefreshURL(); err != nil {
-			return "", err
-		}
-		url = u.PhotoFile.URL
+		return nil, nil
 	}
-	return url, nil
+
+	if err := u.PhotoFile.RefreshURL(); err != nil {
+		return nil, err
+	}
+	return &u.PhotoFile.URL, nil
 }
 
 // Save wraps DB.Save() call to check for errors and operate on attached object
 func (u *User) Save() error {
+	if u.Uuid.Version() == 0 {
+		u.Uuid = domain.GetUuid()
+	}
 	validationErrs, err := u.Validate(DB)
 	if validationErrs != nil && validationErrs.HasAny() {
 		return errors.New(FlattenPopErrors(validationErrs))
@@ -533,17 +528,78 @@ func (u *User) WantsPostNotification(post Post) bool {
 	return true
 }
 
-// GetPreferences returns a slice of matching UserPreference records
-func (u *User) GetPreferences() (UserPreferences, error) {
-	uPrefs := UserPreferences{}
-	err := DB.Where("user_id = ?", u.ID).All(&uPrefs)
+// GetPreferences returns a StandardPreferences struct
+func (u *User) GetPreferences() (StandardPreferences, error) {
+	if err := DB.Load(u, "UserPreferences"); err != nil {
+		err := errors.New("error getting user preferences ... " + err.Error())
+		return StandardPreferences{}, err
+	}
 
-	return uPrefs, err
+	dbPreferences := map[string]string{}
+
+	// Build up a map of the User's Preferences in the database while also
+	// checking that they are each allowed
+	for _, uP := range u.UserPreferences {
+		_, ok := allowedUserPreferenceKeys[uP.Key]
+		if !ok {
+			domain.Logger.Printf("the database included a user preference with an unexpected key %s", uP.Key)
+			continue
+		}
+		dbPreferences[uP.Key] = uP.Value
+	}
+
+	var goodPreferences StandardPreferences
+
+	if language, ok := dbPreferences[domain.UserPreferenceKeyLanguage]; ok {
+		if domain.IsLanguageAllowed(language) {
+			goodPreferences.Language = language
+		} else {
+			domain.Logger.Print("user preference language in database not allowed ... " + language)
+		}
+	}
+
+	if timeZone, ok := dbPreferences[domain.UserPreferenceKeyTimeZone]; ok {
+		if domain.IsTimeZoneAllowed(timeZone) {
+			goodPreferences.TimeZone = timeZone
+		} // IsTimeZoneAllowed logs a message if it's unrecognized
+	}
+
+	if weightUnit, ok := dbPreferences[domain.UserPreferenceKeyWeightUnit]; ok {
+		if domain.IsWeightUnitAllowed(weightUnit) {
+			goodPreferences.WeightUnit = weightUnit
+		} else {
+			domain.Logger.Print("user preference weight unit in database not allowed ... " + weightUnit)
+		}
+	}
+
+	return goodPreferences, nil
 }
 
-// GetPreference returns a pointer to a matching UserPreference record or if
-// none is found, returns nil
-func (u *User) GetPreference(key string) (*UserPreference, error) {
+func (u *User) createPreference(key, value string) (UserPreference, error) {
+	uPref := UserPreference{}
+
+	if u.ID <= 0 {
+		return UserPreference{}, errors.New("invalid user ID in createPreference.")
+	}
+
+	_ = DB.Where("user_id = ?", u.ID).Where("key = ?", key).First(&uPref)
+	if uPref.ID > 0 {
+		err := fmt.Errorf("can't create UserPreference with key %s.  Already exists with id %v.", key, uPref.ID)
+		return UserPreference{}, err
+	}
+
+	uPref.UserID = u.ID
+	uPref.Key = key
+	uPref.Value = value
+
+	if err := uPref.Save(); err != nil {
+		return UserPreference{}, err
+	}
+
+	return uPref, nil
+}
+
+func (u *User) getPreference(key string) (*UserPreference, error) {
 	uPref := UserPreference{}
 
 	err := DB.Where("user_id = ?", u.ID).Where("key = ?", key).First(&uPref)
@@ -557,40 +613,16 @@ func (u *User) GetPreference(key string) (*UserPreference, error) {
 	return &uPref, nil
 }
 
-func (u *User) CreatePreference(key, value string) (UserPreference, error) {
-	uPref := UserPreference{}
+// updatePreferenceByKey will also create a new instance, if a match is not found for that user
+func (u *User) updatePreferenceByKey(key, value string) (UserPreference, error) {
 
-	if u.ID <= 0 {
-		return UserPreference{}, errors.New("invalid user ID in CreatePreference.")
-	}
-
-	DB.Where("user_id = ?", u.ID).Where("key = ?", key).First(&uPref)
-	if uPref.ID > 0 {
-		err := fmt.Errorf("can't create UserPreference with key %s.  Already exists with id %v.", key, uPref.ID)
-		return UserPreference{}, err
-	}
-
-	uPref.UserID = u.ID
-	uPref.Key = key
-	uPref.Value = value
-
-	if err := DB.Save(&uPref); err != nil {
-		return UserPreference{}, err
-	}
-
-	return uPref, nil
-}
-
-// UpdatePreferenceByKey will also create a new instance, if a match is not found for that user
-func (u *User) UpdatePreferenceByKey(key, value string) (UserPreference, error) {
-
-	uPref, err := u.GetPreference(key)
+	uPref, err := u.getPreference(key)
 	if err != nil {
 		return UserPreference{}, err
 	}
 
 	if uPref == nil {
-		return u.CreatePreference(key, value)
+		return u.createPreference(key, value)
 	}
 
 	if uPref.Value == value {
@@ -599,23 +631,48 @@ func (u *User) UpdatePreferenceByKey(key, value string) (UserPreference, error) 
 
 	uPref.Value = value
 
-	if err := DB.Save(uPref); err != nil {
+	if err := uPref.Save(); err != nil {
 		return UserPreference{}, err
 	}
 
 	return *uPref, nil
 }
 
-// UpdatePreferencesByKey will also create new instances for preferences that don't exist for that user
-func (u *User) UpdatePreferencesByKey(keyVals [][2]string) (UserPreferences, error) {
-	uPrefs := make(UserPreferences, len(keyVals))
+// UpdatePreferencesByKey will also create new instances for preferences that don't exist for that user.
+// It assumes the user already has a valid ID
+func (u *User) UpdateStandardPreferences(prefs StandardPreferences) (StandardPreferences, error) {
 
-	for i, keyVal := range keyVals {
-		uP, err := u.UpdatePreferenceByKey(keyVal[0], keyVal[1])
-		if err != nil {
-			return UserPreferences{}, err
+	if prefs.Language != "" {
+		if !domain.IsLanguageAllowed(prefs.Language) {
+			return StandardPreferences{}, errors.New("unexpected UserPreference language ... " + prefs.Language)
 		}
-		uPrefs[i] = uP
+
+		_, err := u.updatePreferenceByKey(domain.UserPreferenceKeyLanguage, prefs.Language)
+		if err != nil {
+			return StandardPreferences{}, err
+		}
+	}
+
+	if prefs.TimeZone != "" {
+		if !domain.IsTimeZoneAllowed(prefs.TimeZone) {
+			return StandardPreferences{}, errors.New("unexpected UserPreference time zone ... " + prefs.TimeZone)
+		}
+
+		_, err := u.updatePreferenceByKey(domain.UserPreferenceKeyTimeZone, prefs.TimeZone)
+		if err != nil {
+			return StandardPreferences{}, err
+		}
+	}
+
+	if prefs.WeightUnit != "" {
+		if !domain.IsWeightUnitAllowed(prefs.WeightUnit) {
+			return StandardPreferences{}, errors.New("unexpected UserPreference weight unit ... " + prefs.WeightUnit)
+		}
+
+		_, err := u.updatePreferenceByKey(domain.UserPreferenceKeyWeightUnit, prefs.WeightUnit)
+		if err != nil {
+			return StandardPreferences{}, err
+		}
 	}
 
 	return u.GetPreferences()

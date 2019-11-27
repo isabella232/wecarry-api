@@ -3,10 +3,9 @@ package gqlgen
 import (
 	"context"
 	"errors"
+	"strings"
 
-	"github.com/99designs/gqlgen/graphql"
 	"github.com/gobuffalo/nulls"
-	"github.com/silinternational/wecarry-api/domain"
 	"github.com/silinternational/wecarry-api/models"
 )
 
@@ -15,23 +14,6 @@ var PostRoleMap = map[PostRole]string{
 	PostRoleCreatedby: models.PostsCreated,
 	PostRoleReceiving: models.PostsReceiving,
 	PostRoleProviding: models.PostsProviding,
-}
-
-// UserFields maps GraphQL fields to their equivalent database fields. For related types, the
-// foreign key field name is provided.
-func UserFields() map[string]string {
-	return map[string]string{
-		"id":          "uuid",
-		"email":       "email",
-		"nickname":    "nickname",
-		"accessToken": "access_token",
-		"createdAt":   "created_at",
-		"updatedAt":   "updated_at",
-		"adminRole":   "admin_role",
-		"photoURL":    "photo_url",
-		"photoFile":   "photo_file_id",
-		"location":    "location_id",
-	}
 }
 
 // User is required by gqlgen
@@ -80,16 +62,15 @@ func (r *userResolver) Posts(ctx context.Context, obj *models.User, role PostRol
 	return posts, nil
 }
 
-// PhotoURL retrieves a URL for the user profile photo or avatar. It can either be an attached photo or
-// a photo belonging to an external profile such as Gravatar or Google.
-func (r *userResolver) PhotoURL(ctx context.Context, obj *models.User) (string, error) {
+// PhotoURL retrieves a URL for the user profile photo or avatar.
+func (r *userResolver) PhotoURL(ctx context.Context, obj *models.User) (*string, error) {
 	if obj == nil {
-		return "", nil
+		return nil, nil
 	}
 
 	photoURL, err := obj.GetPhotoURL()
 	if err != nil {
-		return "", reportError(ctx, err, "GetUserPhotoURL")
+		return nil, reportError(ctx, err, "GetUserPhotoURL")
 	}
 
 	return photoURL, nil
@@ -141,12 +122,8 @@ func (r *queryResolver) Users(ctx context.Context) ([]models.User, error) {
 	}
 
 	users := models.Users{}
-	selectFields := GetSelectFieldsForUsers(ctx)
-	if err := users.All(selectFields...); err != nil {
-		extras := map[string]interface{}{
-			"fields": selectFields,
-		}
-		return nil, reportError(ctx, err, "GetUsers", extras)
+	if err := users.All(); err != nil {
+		return nil, reportError(ctx, err, "GetUsers")
 	}
 
 	return users, nil
@@ -170,26 +147,11 @@ func (r *queryResolver) User(ctx context.Context, id *string) (*models.User, err
 	}
 
 	dbUser := models.User{}
-	selectFields := GetSelectFieldsForUsers(ctx)
-	if err := dbUser.FindByUUID(*id, selectFields...); err != nil {
-		extras := map[string]interface{}{
-			"fields": selectFields,
-		}
-		return nil, reportError(ctx, err, "GetUser", extras)
+	if err := dbUser.FindByUUID(*id); err != nil {
+		return nil, reportError(ctx, err, "GetUser")
 	}
 
 	return &dbUser, nil
-}
-
-// GetSelectFieldsForUsers returns a list of database fields appropriate for the current query. Foreign keys
-// will be included as needed.
-func GetSelectFieldsForUsers(ctx context.Context) []string {
-	selectFields := GetSelectFieldsFromRequestFields(UserFields(), graphql.CollectAllFields(ctx))
-	selectFields = append(selectFields, "id")
-	if domain.IsStringInSlice("photoURL", graphql.CollectAllFields(ctx)) {
-		selectFields = append(selectFields, "photo_file_id")
-	}
-	return selectFields
 }
 
 // UpdateUser takes data from the GraphQL `UpdateUser` mutation and updates the database. If the
@@ -230,14 +192,15 @@ func (r *mutationResolver) UpdateUser(ctx context.Context, input UpdateUserInput
 		}
 	}
 
-	var preferences models.UserPreferences
-
+	// No deleting of preferences supported at this time
 	if input.Preferences != nil {
-		// No deleting of preferences supported at this time
-		keyVals := convertUserPreferencesToKeyValues(input.Preferences)
+		standardPrefs, err := convertUserPreferencesToStandardPreferences(input.Preferences)
 
-		var err error
-		if preferences, err = user.UpdatePreferencesByKey(keyVals); err != nil {
+		if err != nil {
+			return nil, reportError(ctx, err, "UpdateUser.PreferencesInput")
+		}
+
+		if standardPrefs, err = user.UpdateStandardPreferences(standardPrefs); err != nil {
 			return nil, reportError(ctx, err, "UpdateUser.Preferences")
 		}
 	}
@@ -246,19 +209,18 @@ func (r *mutationResolver) UpdateUser(ctx context.Context, input UpdateUserInput
 		return nil, reportError(ctx, err, "UpdateUser")
 	}
 
-	user.UserPreferences = preferences
-
 	return &user, nil
 }
 
-// Preferences resolves the `preferences` property of the user query, retrieving the related records from the database.
-func (r *userResolver) Preferences(ctx context.Context, obj *models.User) ([]models.UserPreference, error) {
+// Preferences resolves the `preferences` property of the user query, retrieving the related records from the database
+// and using them to hydrate a StandardPreferences struct.
+func (r *userResolver) Preferences(ctx context.Context, obj *models.User) (*models.StandardPreferences, error) {
 	if obj == nil {
 		return nil, nil
 	}
 
 	user := models.GetCurrentUserFromGqlContext(ctx, TestUser)
-	preferences, err := obj.GetPreferences()
+	standardPrefs, err := obj.GetPreferences()
 	if err != nil {
 		extras := map[string]interface{}{
 			"user": user.Uuid,
@@ -266,5 +228,9 @@ func (r *userResolver) Preferences(ctx context.Context, obj *models.User) ([]mod
 		return nil, reportError(ctx, err, "GetUserPreferences", extras)
 	}
 
-	return preferences, nil
+	// These have particular acceptable values, unlike TimeZone
+	standardPrefs.Language = strings.ToUpper(standardPrefs.Language)
+	standardPrefs.WeightUnit = strings.ToUpper(standardPrefs.WeightUnit)
+
+	return &standardPrefs, nil
 }

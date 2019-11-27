@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -104,28 +105,21 @@ func (ms *ModelSuite) TestThread_GetPost() {
 	posts := CreatePostFixtures(ms, t, users)
 	threadFixtures := CreateThreadFixtures(ms, posts[0])
 
-	type args struct {
-		thread       Thread
-		selectFields []string
-	}
 	tests := []struct {
 		name    string
-		args    args
+		thread  Thread
 		want    Post
 		wantErr bool
 	}{
 		{
-			name: "good",
-			args: args{
-				thread:       threadFixtures.Threads[0],
-				selectFields: []string{"uuid"},
-			},
-			want: posts[0],
+			name:   "good",
+			thread: threadFixtures.Threads[0],
+			want:   posts[0],
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got, err := test.args.thread.GetPost(test.args.selectFields)
+			got, err := test.thread.GetPost()
 			if test.wantErr {
 				if (err != nil) != test.wantErr {
 					t.Errorf("GetPost() did not return expected error")
@@ -148,32 +142,22 @@ func (ms *ModelSuite) TestThread_GetMessages() {
 	posts := CreatePostFixtures(ms, t, users)
 	threadFixtures := CreateThreadFixtures(ms, posts[0])
 
-	type args struct {
-		thread       Thread
-		selectFields []string
-	}
 	tests := []struct {
 		name    string
-		args    args
+		thread  Thread
 		want    []uuid.UUID
 		wantErr bool
 	}{
 		{
-			name: "one message",
-			args: args{
-				thread:       threadFixtures.Threads[0],
-				selectFields: []string{},
-			},
+			name:   "one message",
+			thread: threadFixtures.Threads[0],
 			want: []uuid.UUID{
 				threadFixtures.Messages[0].Uuid,
 			},
 		},
 		{
-			name: "two messages",
-			args: args{
-				thread:       threadFixtures.Threads[1],
-				selectFields: []string{},
-			},
+			name:   "two messages",
+			thread: threadFixtures.Threads[1],
 			want: []uuid.UUID{
 				threadFixtures.Messages[1].Uuid,
 				threadFixtures.Messages[2].Uuid,
@@ -182,7 +166,7 @@ func (ms *ModelSuite) TestThread_GetMessages() {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got, err := test.args.thread.GetMessages(test.args.selectFields)
+			got, err := test.thread.GetMessages()
 			if test.wantErr {
 				if (err != nil) != test.wantErr {
 					t.Errorf("GetMessages() did not return expected error")
@@ -211,32 +195,22 @@ func (ms *ModelSuite) TestThread_GetParticipants() {
 	posts := CreatePostFixtures(ms, t, users)
 	threadFixtures := CreateThreadFixtures(ms, posts[0])
 
-	type args struct {
-		thread       Thread
-		selectFields []string
-	}
 	tests := []struct {
 		name    string
-		args    args
+		thread  Thread
 		want    []uuid.UUID
 		wantErr bool
 	}{
 		{
-			name: "one participant",
-			args: args{
-				thread:       threadFixtures.Threads[0],
-				selectFields: []string{},
-			},
+			name:   "one participant",
+			thread: threadFixtures.Threads[0],
 			want: []uuid.UUID{
 				users[0].Uuid,
 			},
 		},
 		{
-			name: "two participants",
-			args: args{
-				thread:       threadFixtures.Threads[1],
-				selectFields: []string{},
-			},
+			name:   "two participants",
+			thread: threadFixtures.Threads[1],
 			want: []uuid.UUID{
 				users[1].Uuid,
 				users[0].Uuid,
@@ -245,7 +219,7 @@ func (ms *ModelSuite) TestThread_GetParticipants() {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got, err := test.args.thread.GetParticipants(test.args.selectFields)
+			got, err := test.thread.GetParticipants()
 			if test.wantErr {
 				if (err != nil) != test.wantErr {
 					t.Errorf("GetParticipants() did not return expected error")
@@ -290,7 +264,9 @@ func (ms *ModelSuite) TestThread_CreateWithParticipants() {
 			threadFromDB.PostID, post.ID)
 	}
 
-	ids := make([]uuid.UUID, len(threadFromDB.Participants))
+	participants, err := threadFromDB.GetParticipants()
+
+	ids := make([]uuid.UUID, len(participants))
 	for i := range threadFromDB.Participants {
 		ids[i] = threadFromDB.Participants[i].Uuid
 	}
@@ -305,6 +281,63 @@ func (ms *ModelSuite) TestThread_CreateWithParticipants() {
 		t.Errorf("TestThread_CreateWithParticipants() couldn't read from thread_participants: %s", err)
 	}
 	ms.Equal(2, n, "incorrect number of thread_participants records created")
+}
+
+func (ms *ModelSuite) TestThread_ensureParticipants() {
+	t := ms.T()
+
+	_, users, _ := CreateUserFixtures(ms, t)
+	posts := CreatePostFixtures(ms, t, users)
+	post := posts[0]
+
+	thread := Thread{
+		PostID: post.ID,
+		Uuid:   domain.GetUuid(),
+	}
+
+	err := DB.Save(&thread)
+	ms.NoError(err, "TestThread_ensureParticipants() error saving new thread for test")
+
+	tests := []struct {
+		name   string
+		userID int
+		want   []uuid.UUID
+	}{
+		{
+			name:   "just creator",
+			userID: users[0].ID,
+			want:   []uuid.UUID{users[0].Uuid},
+		},
+		{
+			name:   "add provider",
+			userID: users[1].ID,
+			want:   []uuid.UUID{users[0].Uuid, users[1].Uuid},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := thread.ensureParticipants(post, test.userID)
+			ms.NoError(err)
+
+			participants, err := thread.GetParticipants()
+			ms.NoError(err, "can't get thread participants from thread")
+
+			ids := make([]uuid.UUID, len(participants))
+			for i := range participants {
+				ids[i] = participants[i].Uuid
+			}
+
+			ms.Equal(len(test.want), len(ids), "incorrect number of participants found")
+
+			ms.Contains(ids, test.want[0], "new thread doesn't include post creator as participant")
+
+			if len(test.want) == 2 {
+				ms.Contains(ids, users[1].Uuid, "new thread doesn't include provided user as participant")
+			}
+
+		})
+	}
 }
 
 func (ms *ModelSuite) TestThread_GetLastViewedAt() {
@@ -349,7 +382,42 @@ func (ms *ModelSuite) TestThread_GetLastViewedAt() {
 			}
 
 			ms.NoError(err)
-			ms.Equal(test.want.Format(time.RFC3339), lastViewedAt.Format(time.RFC3339))
+			ms.WithinDuration(test.want, *lastViewedAt, time.Duration(time.Second))
+		})
+	}
+}
+
+func (ms *ModelSuite) TestThread_UpdateLastViewedAt() {
+	t := ms.T()
+	f := CreateFixtures_ThreadParticipant_UpdateLastViewedAt(ms, t)
+
+	tests := []struct {
+		name         string
+		thread       Thread
+		user         User
+		lastViewedAt time.Time
+		wantErr      string
+	}{
+		{name: "good", thread: f.Threads[0], user: f.Users[0], lastViewedAt: time.Now()},
+		{name: "wrong user", thread: f.Threads[0], user: f.Users[1], wantErr: "failed to find thread_participant"},
+		// other combinations are tested in TestThreadParticipant_UpdateLastViewedAt and
+		// TestThreadParticipant_FindByThreadIDAndUserID
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := test.thread.UpdateLastViewedAt(test.user.ID, test.lastViewedAt)
+
+			if test.wantErr != "" {
+				ms.Error(err)
+				ms.Contains(err.Error(), test.wantErr, "unexpected error")
+				return
+			}
+			ms.NoError(err)
+
+			lastViewedAt, err := test.thread.GetLastViewedAt(test.user)
+			ms.NoError(err)
+			ms.WithinDuration(test.lastViewedAt, *lastViewedAt, time.Second,
+				fmt.Sprintf("time not correct, got %v, wanted %v", lastViewedAt, test.lastViewedAt))
 		})
 	}
 }

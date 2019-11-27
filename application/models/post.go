@@ -165,6 +165,10 @@ func (p Posts) String() string {
 
 // Create stores the Post data as a new record in the database.
 func (p *Post) Create() error {
+	if p.Uuid.Version() == 0 {
+		p.Uuid = domain.GetUuid()
+	}
+
 	valErrs, err := DB.ValidateAndCreate(p)
 	if err != nil {
 		return err
@@ -194,7 +198,6 @@ func (p *Post) Update() error {
 }
 
 func (p *Post) NewWithUser(pType PostType, currentUser User) error {
-	p.Uuid = domain.GetUuid()
 	p.CreatedByID = currentUser.ID
 	p.Status = PostStatusOpen
 
@@ -440,33 +443,33 @@ func (p *Post) FindByUUID(uuid string) error {
 	return nil
 }
 
-func (p *Post) GetCreator(fields []string) (*User, error) {
+func (p *Post) GetCreator() (*User, error) {
 	creator := User{}
-	if err := DB.Select(fields...).Find(&creator, p.CreatedByID); err != nil {
+	if err := DB.Find(&creator, p.CreatedByID); err != nil {
 		return nil, err
 	}
 	return &creator, nil
 }
 
-func (p *Post) GetProvider(fields []string) (*User, error) {
+func (p *Post) GetProvider() (*User, error) {
 	provider := User{}
-	if err := DB.Select(fields...).Find(&provider, p.ProviderID); err != nil {
+	if err := DB.Find(&provider, p.ProviderID); err != nil {
 		return nil, nil // provider is a nullable field, so ignore any error
 	}
 	return &provider, nil
 }
 
-func (p *Post) GetReceiver(fields []string) (*User, error) {
+func (p *Post) GetReceiver() (*User, error) {
 	receiver := User{}
-	if err := DB.Select(fields...).Find(&receiver, p.ReceiverID); err != nil {
+	if err := DB.Find(&receiver, p.ReceiverID); err != nil {
 		return nil, nil // receiver is a nullable field, so ignore any error
 	}
 	return &receiver, nil
 }
 
-func (p *Post) GetOrganization(fields []string) (*Organization, error) {
+func (p *Post) GetOrganization() (*Organization, error) {
 	organization := Organization{}
-	if err := DB.Select(fields...).Find(&organization, p.OrganizationID); err != nil {
+	if err := DB.Find(&organization, p.OrganizationID); err != nil {
 		return nil, err
 	}
 
@@ -474,7 +477,7 @@ func (p *Post) GetOrganization(fields []string) (*Organization, error) {
 }
 
 // GetThreads finds all threads on this post in which the given user is participating
-func (p *Post) GetThreads(fields []string, user User) ([]Thread, error) {
+func (p *Post) GetThreads(user User) ([]Thread, error) {
 	var threads Threads
 	query := DB.Q().
 		Join("thread_participants tp", "threads.id = tp.thread_id").
@@ -572,6 +575,9 @@ func scopeUserOrgs(cUser User) pop.ScopeFunc {
 			s[i] = v
 		}
 
+		if len(s) == 0 {
+			return q.Where("organization_id = -1")
+		}
 		return q.Where("organization_id IN (?)", s...)
 	}
 }
@@ -585,15 +591,14 @@ func scopeNotRemoved() pop.ScopeFunc {
 
 // FindByUserAndUUID finds the post identified by the given UUID if it belongs to the same organization as the
 // given user and if the post has not been marked as removed.
-func (p *Post) FindByUserAndUUID(ctx context.Context, user User, uuid string, selectFields ...string) error {
-	return DB.Select(selectFields...).Scope(scopeUserOrgs(user)).Scope(scopeNotRemoved()).
+func (p *Post) FindByUserAndUUID(ctx context.Context, user User, uuid string) error {
+	return DB.Scope(scopeUserOrgs(user)).Scope(scopeNotRemoved()).
 		Where("uuid = ?", uuid).First(p)
 }
 
 // FindByUser finds all posts belonging to the same organization as the given user and not marked as removed.
-func (p *Posts) FindByUser(ctx context.Context, user User, selectFields ...string) error {
+func (p *Posts) FindByUser(ctx context.Context, user User) error {
 	return DB.
-		Select(selectFields...).
 		Scope(scopeUserOrgs(user)).
 		Scope(scopeNotRemoved()).
 		Order("created_at desc").
@@ -710,7 +715,7 @@ func (p *Post) GetAudience() (Users, error) {
 	if p.ID <= 0 {
 		return nil, errors.New("invalid post ID in GetAudience")
 	}
-	org, err := p.GetOrganization([]string{"id"})
+	org, err := p.GetOrganization()
 	if err != nil {
 		return nil, err
 	}
