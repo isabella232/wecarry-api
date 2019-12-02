@@ -396,7 +396,7 @@ func (p *Post) AfterUpdate(tx *pop.Connection) error {
 	p.ProviderID = nulls.Int{}
 
 	// Don't try to use DB.Update inside AfterUpdate, since that gets into an eternal loop
-	if err := DB.RawQuery(
+	if err := tx.RawQuery(
 		fmt.Sprintf(`UPDATE posts set provider_id = NULL where ID = %v`, p.ID)).Exec(); err != nil {
 		domain.ErrLogger.Print("error removing provider id from post ... " + err.Error())
 	}
@@ -626,12 +626,17 @@ func (p *Post) GetDestination(ctx context.Context) (*Location, error) {
 }
 
 // GetOrigin reads the origin record, if it exists, and returns the Location object.
-func (p *Post) GetOrigin() (*Location, error) {
+func (p *Post) GetOrigin(ctx context.Context) (*Location, error) {
+	tx, ok := ctx.Value("tx").(*pop.Connection)
+	if !ok {
+		return nil, errors.New("no transaction found")
+	}
+
 	if !p.OriginID.Valid {
 		return nil, nil
 	}
 	location := Location{}
-	if err := DB.Find(&location, p.OriginID); err != nil {
+	if err := tx.Find(&location, p.OriginID); err != nil {
 		return nil, err
 	}
 
@@ -660,18 +665,25 @@ func (p *Post) SetDestination(ctx context.Context, location Location) error {
 	return nil
 }
 
-// SetOrigin sets the origin location fields, creating a new record in the database if necessary.
-func (p *Post) SetOrigin(location Location) error {
+// SetOrigin sets the origin location fields, creating a new record in the database if necessary. It does NOT save
+// any changes to the Post model in the database, to avoid race conditions with multiple updates to the same record
+// in one transaction. The Post update must be done after calling this function.
+func (p *Post) SetOrigin(ctx context.Context, location Location) error {
+	tx, ok := ctx.Value("tx").(*pop.Connection)
+	if !ok {
+		return errors.New("no transaction found")
+	}
+
 	if p.OriginID.Valid {
 		location.ID = p.OriginID.Int
 		p.Origin = location
-		return DB.Update(&p.Origin)
+		return tx.Update(&p.Origin)
 	}
-	if err := DB.Create(&location); err != nil {
+	if err := tx.Create(&location); err != nil {
 		return err
 	}
 	p.OriginID = nulls.NewInt(location.ID)
-	return DB.Update(p)
+	return nil
 }
 
 // IsEditable response with true if the given user is the owner of the post or an admin,

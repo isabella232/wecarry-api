@@ -123,7 +123,8 @@ func (r *postResolver) Origin(ctx context.Context, obj *models.Post) (*models.Lo
 		return nil, nil
 	}
 
-	origin, err := obj.GetOrigin()
+	bc := models.GetBuffaloContextFromGqlContext(ctx)
+	origin, err := obj.GetOrigin(bc)
 	if err != nil {
 		return nil, reportError(ctx, err, "GetPostOrigin")
 	}
@@ -369,7 +370,8 @@ func (r *mutationResolver) CreatePost(ctx context.Context, input postInput) (*mo
 	}
 
 	if input.Origin != nil {
-		if err4 := post.SetOrigin(convertGqlLocationInputToDBLocation(*input.Origin)); err4 != nil {
+		bc := models.GetBuffaloContextFromGqlContext(ctx)
+		if err4 := post.SetOrigin(bc, convertGqlLocationInputToDBLocation(*input.Origin)); err4 != nil {
 			return nil, reportError(ctx, err4, "CreatePost.SetOrigin", extras)
 		}
 	}
@@ -399,10 +401,6 @@ func (r *mutationResolver) UpdatePost(ctx context.Context, input postInput) (*mo
 	}
 
 	bc := models.GetBuffaloContextFromGqlContext(ctx)
-	if err := post.Update(bc); err != nil {
-		return nil, reportError(ctx, err, "UpdatePost", extras)
-	}
-
 	if input.Destination != nil {
 		if err := post.SetDestination(bc, convertGqlLocationInputToDBLocation(*input.Destination)); err != nil {
 			return nil, reportError(ctx, err, "UpdatePost.SetDestination", extras)
@@ -410,9 +408,13 @@ func (r *mutationResolver) UpdatePost(ctx context.Context, input postInput) (*mo
 	}
 
 	if input.Origin != nil {
-		if err5 := post.SetOrigin(convertGqlLocationInputToDBLocation(*input.Origin)); err5 != nil {
+		if err5 := post.SetOrigin(bc, convertGqlLocationInputToDBLocation(*input.Origin)); err5 != nil {
 			return nil, reportError(ctx, err5, "UpdatePost.SetOrigin", extras)
 		}
+	}
+
+	if err := post.Update(bc); err != nil {
+		return nil, reportError(ctx, err, "UpdatePost", extras)
 	}
 
 	return &post, nil
