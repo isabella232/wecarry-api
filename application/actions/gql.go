@@ -18,7 +18,7 @@ func GQLHandler(c buffalo.Context) error {
 
 	if res, ok := c.Response().(*buffalo.Response); ok {
 		if res.Status < 200 || res.Status >= 400 {
-			return errors.New("non-success error code returned from gqlgen handler")
+			return nil
 		}
 	}
 
