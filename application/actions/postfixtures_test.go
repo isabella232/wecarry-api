@@ -1,6 +1,7 @@
 package actions
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/gobuffalo/nulls"
@@ -9,14 +10,15 @@ import (
 	"github.com/silinternational/wecarry-api/models"
 )
 
-type UpdatePostFixtures struct {
+type PostFixtures struct {
 	models.Posts
+	models.Organizations
 	models.Users
 	models.Files
 	models.Locations
 }
 
-func createFixturesForUpdatePost(as *ActionSuite) UpdatePostFixtures {
+func createFixturesForUpdatePost(as *ActionSuite) PostFixtures {
 	t := as.T()
 
 	org := models.Organization{Uuid: domain.GetUuid(), AuthConfig: "{}"}
@@ -122,9 +124,116 @@ func createFixturesForUpdatePost(as *ActionSuite) UpdatePostFixtures {
 		t.FailNow()
 	}
 
-	return UpdatePostFixtures{
+	return PostFixtures{
 		Posts: posts,
 		Users: users,
 		Files: fileFixtures,
+	}
+}
+
+func createFixturesForCreatePost(as *ActionSuite) PostFixtures {
+	t := as.T()
+
+	org := models.Organization{Uuid: domain.GetUuid(), AuthConfig: "{}"}
+	createFixture(as, &org)
+
+	user := models.User{
+		Email:    t.Name() + "_user1@example.com",
+		Nickname: t.Name() + " User1",
+		Uuid:     domain.GetUuid(),
+	}
+	createFixture(as, &user)
+
+	userOrg := models.UserOrganization{
+		OrganizationID: org.ID,
+		UserID:         user.ID,
+		AuthID:         t.Name() + "_auth_user1",
+		AuthEmail:      user.Email,
+	}
+	createFixture(as, &userOrg)
+
+	accessTokenFixtures := []models.UserAccessToken{
+		{
+			UserID:             user.ID,
+			UserOrganizationID: userOrg.ID,
+			AccessToken:        models.HashClientIdAccessToken(user.Nickname),
+			ExpiresAt:          time.Now().Add(time.Minute * 60),
+		},
+	}
+	for i := range accessTokenFixtures {
+		createFixture(as, &accessTokenFixtures[i])
+	}
+
+	if err := aws.CreateS3Bucket(); err != nil {
+		t.Errorf("failed to create S3 bucket, %s", err)
+		t.FailNow()
+	}
+
+	var fileFixture models.File
+	if err := fileFixture.Store("photo.gif", []byte("GIF89a")); err != nil {
+		t.Errorf("failed to create file fixture, %s", err)
+		t.FailNow()
+	}
+
+	return PostFixtures{
+		Users:         models.Users{user},
+		Organizations: models.Organizations{org},
+		Files:         models.Files{fileFixture},
+	}
+}
+
+func createFixturesForUpdatePostStatus(as *ActionSuite) PostFixtures {
+	org := models.Organization{Uuid: domain.GetUuid(), AuthConfig: "{}"}
+	createFixture(as, &org)
+
+	unique := org.Uuid.String()
+	users := make(models.Users, 2)
+	userOrgs := make(models.UserOrganizations, len(users))
+	accessTokens := make(models.UserAccessTokens, len(users))
+	for i := range users {
+		users[i] = models.User{
+			Email:    fmt.Sprintf("%s_user%d@example.com", unique, i),
+			Nickname: fmt.Sprintf("%s_User%d", unique, i),
+			Uuid:     domain.GetUuid(),
+		}
+		createFixture(as, &users[i])
+
+		userOrgs[i] = models.UserOrganization{
+			OrganizationID: org.ID,
+			UserID:         users[i].ID,
+			AuthID:         users[i].Email,
+			AuthEmail:      users[i].Email,
+		}
+		createFixture(as, &userOrgs[i])
+
+		accessTokens[i] = models.UserAccessToken{
+			UserID:             users[i].ID,
+			UserOrganizationID: userOrgs[i].ID,
+			AccessToken:        models.HashClientIdAccessToken(users[i].Nickname),
+			ExpiresAt:          time.Now().Add(time.Minute * 60),
+		}
+		createFixture(as, &accessTokens[i])
+	}
+
+	posts := make(models.Posts, 1)
+	locations := make(models.Locations, len(posts))
+	for i := range posts {
+		createFixture(as, &locations[i])
+
+		posts[i].CreatedByID = users[0].ID
+		posts[i].ReceiverID = nulls.NewInt(users[0].ID)
+		posts[i].OrganizationID = org.ID
+		posts[i].Uuid = domain.GetUuid()
+		posts[i].DestinationID = locations[i].ID
+		posts[i].Title = "title"
+		posts[i].Size = models.PostSizeSmall
+		posts[i].Type = models.PostTypeRequest
+		posts[i].Status = models.PostStatusOpen
+		createFixture(as, &posts[i])
+	}
+
+	return PostFixtures{
+		Posts: posts,
+		Users: users,
 	}
 }

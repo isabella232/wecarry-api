@@ -109,3 +109,89 @@ func (as *ActionSuite) Test_UpdatePost() {
 
 	as.Error(as.testGqlQuery(query, f.Users[1].Nickname, &postsResp))
 }
+
+func (as *ActionSuite) Test_CreatePost() {
+	f := createFixturesForCreatePost(as)
+
+	var postsResp PostResponse
+
+	input := `orgID: "` + f.Organizations[0].Uuid.String() + `"` +
+		`photoID: "` + f.Files[0].UUID.String() + `"` +
+		` 
+			type: REQUEST
+			title: "title"
+			description: "new description"
+			destination: {description:"dest" country:"dc" latitude:1.1 longitude:2.2}
+			size: TINY
+			neededAfter: "2019-11-01"
+			neededBefore: "2019-12-25"
+			category: "cat"
+			url: "example.com" 
+			cost: "1.00"
+		`
+	query := `mutation { post: createPost(input: {` + input + `}) { organization { id } photo { id } type title 
+			description destination { description country latitude longitude } 
+			origin { description country latitude longitude }
+			size neededAfter neededBefore category url cost }}`
+
+	as.NoError(as.testGqlQuery(query, f.Users[0].Nickname, &postsResp))
+
+	as.Equal(f.Organizations[0].Uuid.String(), postsResp.Post.Organization.ID)
+	as.Equal(f.Files[0].UUID.String(), postsResp.Post.Photo.ID)
+	as.Equal(models.PostTypeRequest, postsResp.Post.Type)
+	as.Equal("title", postsResp.Post.Title)
+	as.Equal("new description", postsResp.Post.Description)
+	as.Equal(models.PostStatus(""), postsResp.Post.Status)
+	as.Equal("dest", postsResp.Post.Destination.Description)
+	as.Equal("dc", postsResp.Post.Destination.Country)
+	as.Equal(1.1, postsResp.Post.Destination.Lat)
+	as.Equal(2.2, postsResp.Post.Destination.Long)
+	as.Equal("", postsResp.Post.Origin.Description)
+	as.Equal("", postsResp.Post.Origin.Country)
+	as.Equal(0.0, postsResp.Post.Origin.Lat)
+	as.Equal(0.0, postsResp.Post.Origin.Long)
+	as.Equal(models.PostSizeTiny, postsResp.Post.Size)
+	as.Equal("2019-11-01T00:00:00Z", postsResp.Post.NeededAfter)
+	as.Equal("2019-12-25T00:00:00Z", postsResp.Post.NeededBefore)
+	as.Equal("cat", postsResp.Post.Category)
+	as.Equal("example.com", postsResp.Post.Url)
+	as.Equal("1", postsResp.Post.Cost)
+}
+
+func (as *ActionSuite) Test_UpdatePostStatus() {
+	f := createFixturesForUpdatePostStatus(as)
+
+	var postsResp PostResponse
+
+	creator := f.Users[0]
+	provider := f.Users[1]
+
+	steps := []struct {
+		status  models.PostStatus
+		user    models.User
+		wantErr bool
+	}{
+		{status: models.PostStatusCommitted, user: provider, wantErr: false},
+		{status: models.PostStatusAccepted, user: provider, wantErr: true},
+		{status: models.PostStatusAccepted, user: creator, wantErr: false},
+		{status: models.PostStatusReceived, user: provider, wantErr: true},
+		{status: models.PostStatusReceived, user: creator, wantErr: false},
+		{status: models.PostStatusDelivered, user: provider, wantErr: false},
+		{status: models.PostStatusCompleted, user: provider, wantErr: true},
+		{status: models.PostStatusCompleted, user: creator, wantErr: false},
+		{status: models.PostStatusRemoved, user: creator, wantErr: true},
+	}
+
+	for _, step := range steps {
+		input := `id: "` + f.Posts[0].Uuid.String() + `", status: ` + step.status.String()
+		query := `mutation { post: updatePostStatus(input: {` + input + `}) {id status}}`
+
+		err := as.testGqlQuery(query, step.user.Nickname, &postsResp)
+		if step.wantErr {
+			as.Error(err, "user=%s, query=%s", step.user.Nickname, query)
+		} else {
+			as.NoError(err, "user=%s, query=%s", step.user.Nickname, query)
+			as.Equal(step.status, postsResp.Post.Status)
+		}
+	}
+}
