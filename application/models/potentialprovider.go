@@ -15,13 +15,15 @@ import (
 )
 
 type PotentialProvider struct {
-	ID        int       `json:"id" db:"id"`
-	CreatedAt time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
-	PostID    int       `json:"post_id" db:"post_id"`
-	UserID    int       `json:"user_id" db:"user_id"`
-	Post      Post      `belongs_to:"posts"`
-	User      User      `belongs_to:"users"`
+	ID             int       `json:"id" db:"id"`
+	CreatedAt      time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at" db:"updated_at"`
+	PostID         int       `json:"post_id" db:"post_id"`
+	UserID         int       `json:"user_id" db:"user_id"`
+	DeliveryAfter  time.Time `json:"delivery_after" db:"delivery_after"`
+	DeliveryBefore time.Time `json:"delivery_before" db:"delivery_before"`
+	Post           Post      `belongs_to:"posts"`
+	User           User      `belongs_to:"users"`
 }
 
 // String can be helpful for serializing the model
