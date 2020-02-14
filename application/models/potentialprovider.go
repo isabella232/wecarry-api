@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/gobuffalo/events"
-	"github.com/gobuffalo/nulls"
 	"github.com/gobuffalo/pop"
 	"github.com/gobuffalo/validate"
 	"github.com/gobuffalo/validate/validators"
@@ -16,15 +15,15 @@ import (
 )
 
 type PotentialProvider struct {
-	ID             int        `json:"id" db:"id"`
-	CreatedAt      time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt      time.Time  `json:"updated_at" db:"updated_at"`
-	PostID         int        `json:"post_id" db:"post_id"`
-	UserID         int        `json:"user_id" db:"user_id"`
-	DeliveryAfter  nulls.Time `json:"delivery_after" db:"delivery_after"`
-	DeliveryBefore nulls.Time `json:"delivery_before" db:"delivery_before"`
-	Post           Post       `belongs_to:"posts"`
-	User           User       `belongs_to:"users"`
+	ID             int       `json:"id" db:"id"`
+	CreatedAt      time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at" db:"updated_at"`
+	PostID         int       `json:"post_id" db:"post_id"`
+	UserID         int       `json:"user_id" db:"user_id"`
+	DeliveryAfter  time.Time `json:"delivery_after" db:"delivery_after"`
+	DeliveryBefore time.Time `json:"delivery_before" db:"delivery_before"`
+	Post           Post      `belongs_to:"posts"`
+	User           User      `belongs_to:"users"`
 }
 
 // String can be helpful for serializing the model
@@ -44,14 +43,9 @@ func (p PotentialProviders) String() string {
 
 // Validate gets run every time you call a "pop.Validate*" (pop.ValidateAndSave, pop.ValidateAndCreate, pop.ValidateAndUpdate) method.
 func (p *PotentialProvider) Validate(tx *pop.Connection) (*validate.Errors, error) {
-	validators := []validate.Validator{
-		&validators.IntIsPresent{Field: p.PostID, Name: "PostID"},
-		&validators.IntIsPresent{Field: p.UserID, Name: "UserID"},
-	}
 
-	if !p.DeliveryAfter.Valid && p.DeliveryBefore.Valid {
-		return validate.Validate(validators...), nil
-	}
+	afterDate := p.DeliveryAfter.Format(domain.DateFormat)
+	beforeDate := p.DeliveryBefore.Format(domain.DateFormat)
 
 	return validate.Validate(
 		&validators.IntIsPresent{Field: p.PostID, Name: "PostID"},
@@ -59,7 +53,8 @@ func (p *PotentialProvider) Validate(tx *pop.Connection) (*validate.Errors, erro
 		&uniqueTogetherValidator{Object: p, Name: "UniqueTogether"},
 		&validators.TimeAfterTime{FirstName: "DeliveryBefore", FirstTime: p.DeliveryBefore,
 			SecondName: "DeliveryAfter", SecondTime: p.DeliveryAfter,
-			Message: fmt.Sprintf("DeliveryBefore must be after DeliveryAfter. Got %v and %v", neededBeforeDate)},
+			Message: fmt.Sprintf("DeliveryBefore must be after DeliveryAfter. Got %v and %v",
+				beforeDate, afterDate)},
 	), nil
 }
 

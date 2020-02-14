@@ -45,6 +45,15 @@ type LocationInput struct {
 	Longitude   *float64 `json:"longitude"`
 }
 
+type PotentialProviderInput struct {
+	PostID string `json:"postID"`
+	// Date (yyyy-mm-dd) after which the request can be fufilled (NOT inclusive).
+	// DeliveryAfter must come before deliveryBefore.
+	DeliveryAfter string `json:"deliveryAfter"`
+	// Date (yyyy-mm-dd) before which the request can be fulfilled (inclusive, i.e. 'on or before')
+	DeliveryBefore string `json:"deliveryBefore"`
+}
+
 // User fields that can safely be visible to any user in the system
 type PublicProfile struct {
 	ID        string  `json:"id"`

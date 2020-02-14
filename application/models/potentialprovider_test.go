@@ -3,8 +3,11 @@ package models
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/gofrs/uuid"
+
+	"github.com/silinternational/wecarry-api/domain"
 )
 
 func (ms *ModelSuite) TestPotentialProviders_FindUsersByPostID() {
@@ -195,32 +198,60 @@ func (ms *ModelSuite) TestPotentialProvider_Validate() {
 	users := f.Users
 	posts := f.Posts
 
+	in1Week := time.Now().Add(domain.DurationWeek)
+	in2Weeks := in1Week.Add(domain.DurationWeek)
+
 	t := ms.T()
 	tests := []struct {
-		name     string
-		postID   int
-		userID   int
-		wantIDs  []int
-		wantErrs map[string][]string
+		name           string
+		postID         int
+		userID         int
+		deliveryAfter  time.Time
+		deliveryBefore time.Time
+		wantIDs        []int
+		wantErrs       map[string][]string
 	}{
 		{
-			name:     "good - second post second user",
-			postID:   posts[1].ID,
-			userID:   users[1].ID,
-			wantErrs: map[string][]string{},
+			name:           "good - second post second user",
+			postID:         posts[1].ID,
+			userID:         users[1].ID,
+			deliveryAfter:  in1Week,
+			deliveryBefore: in2Weeks,
+			wantErrs:       map[string][]string{},
 		},
 		{
-			name:   "bad - duplicate",
-			postID: posts[1].ID,
-			userID: users[3].ID,
+			name:           "bad - dates reversed",
+			postID:         posts[1].ID,
+			userID:         9,
+			deliveryAfter:  in2Weeks,
+			deliveryBefore: in1Week,
+			wantErrs: map[string][]string{
+				"delivery_before": {
+					fmt.Sprintf("DeliveryBefore must be after DeliveryAfter. Got %v and %v",
+						in1Week.Format(domain.DateFormat), in2Weeks.Format(domain.DateFormat)),
+				},
+			},
+		},
+		{
+			name:           "bad - duplicate",
+			postID:         posts[1].ID,
+			userID:         users[3].ID,
+			deliveryAfter:  in1Week,
+			deliveryBefore: in2Weeks,
 			wantErrs: map[string][]string{
 				"unique_together": {
-					fmt.Sprintf("Duplicate potential provider exists with PostID: %v and UserID: %v", posts[1].ID, users[3].ID)}},
+					fmt.Sprintf("Duplicate potential provider exists with PostID: %v and UserID: %v", posts[1].ID, users[3].ID)},
+			},
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			provider := PotentialProvider{PostID: test.postID, UserID: test.userID}
+			provider := PotentialProvider{
+				PostID:         test.postID,
+				UserID:         test.userID,
+				DeliveryAfter:  test.deliveryAfter,
+				DeliveryBefore: test.deliveryBefore,
+			}
 			vErrors, err := provider.Validate(ms.DB)
 
 			ms.NoError(err, "unexpected error")

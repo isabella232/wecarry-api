@@ -19,7 +19,7 @@ type Mutation {
     createPost(input: CreatePostInput!): Post!
     updatePost(input: UpdatePostInput!): Post!
     updatePostStatus(input: UpdatePostStatusInput!): Post!
-    addMeAsPotentialProvider(postID: String!): Post!
+    addMeAsPotentialProvider(input: PotentialProviderInput!): Post!
     removeMeAsPotentialProvider(postID: String!): Post!
     removePotentialProvider(postID: String!, userID: String!): Post!
     updateUser(input: UpdateUserInput!): User!
@@ -196,6 +196,15 @@ type Post {
     visibility: PostVisibility!
 }
 
+"The User who has offered to fufill the request and the delivery date range"
+type PotentialProvider {
+    user: PublicProfile!
+    "Date (yyyy-mm-dd). DeliveryAfter is NOT intended to be inclusive of the day itself."
+    deliveryAfter: String!
+    "Date (yyyy-mm-dd). It is intended to be inclusive of the day itself (i.e. 'on or before')"
+    deliveryBefore: String!
+}
+
 type Meeting {
     id: ID!
     name: String!
@@ -338,6 +347,17 @@ input UpdatePostInput {
     photoID: ID
     "Visibility restrictions for this post. If omitted or `null`, the visibility is set to `ALL`."
     visibility: PostVisibility
+}
+
+input PotentialProviderInput {
+    postID: String!
+    """
+    Date (yyyy-mm-dd) after which the request can be fufilled (NOT inclusive).
+    DeliveryAfter must come before deliveryBefore.
+    """
+    deliveryAfter: String!
+    "Date (yyyy-mm-dd) before which the request can be fulfilled (inclusive, i.e. 'on or before')"
+    deliveryBefore: String!
 }
 
 input CreateMeetingInput {
