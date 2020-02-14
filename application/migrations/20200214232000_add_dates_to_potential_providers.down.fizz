@@ -1,0 +1,2 @@
+drop_column("potential_providers", "delivery_after")
+drop_column("potential_providers", "delivery_before")
