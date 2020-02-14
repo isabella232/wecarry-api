@@ -57,8 +57,6 @@ models:
         resolver: true
       provider:
         resolver: true
-      potentialProviders:
-        resolver: true
       destination:
         resolver: true
       origin:
@@ -115,6 +113,8 @@ models:
     model: gqlgen.postInput
   CreatePostInput:
     model: gqlgen.postInput
+  PotentialProvider:
+    model: gqlgen.potentialProvider
   Location:
     model: models.Location
   PostType:

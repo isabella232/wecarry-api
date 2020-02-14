@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/gobuffalo/nulls"
 
@@ -70,18 +71,33 @@ func (r *postResolver) Provider(ctx context.Context, obj *models.Post) (*PublicP
 
 // PotentialProviders resolves the `potentialProviders` property of the post query,
 // retrieving the related records from the database.
-func (r *postResolver) PotentialProviders(ctx context.Context, obj *models.Post) ([]PublicProfile, error) {
+func (r *postResolver) PotentialProviders(ctx context.Context, obj *models.Post) ([]potentialProvider, error) {
 	if obj == nil {
 		return nil, nil
 	}
 
-	providers, err := obj.GetPotentialProviders()
+	dbProviders, err := obj.GetPotentialProviders()
 	if err != nil {
 		return nil, reportError(ctx, err, "GetPotentialProviders")
 	}
 
-	profiles := getPublicProfiles(ctx, providers)
-	return profiles, nil
+	var gqlProviders []potentialProvider
+
+	for _, p := range dbProviders {
+		publicProfile := getPublicProfile(ctx, &p.User)
+		if publicProfile == nil {
+			continue
+		}
+
+		newPotential := potentialProvider{
+			user:           *publicProfile,
+			deliveryAfter:  p.DeliveryAfter.Format(domain.DateFormat),
+			deliveryBefore: p.DeliveryBefore.Format(domain.DateFormat),
+		}
+		gqlProviders = append(gqlProviders, newPotential)
+	}
+
+	return gqlProviders, nil
 }
 
 // Organization resolves the `organization` property of the post query. It retrieves the related record from the
@@ -358,6 +374,12 @@ type postInput struct {
 	Visibility   *models.PostVisibility
 }
 
+type potentialProvider struct {
+	user           PublicProfile
+	deliveryAfter  string
+	deliveryBefore string
+}
+
 // CreatePost resolves the `createPost` mutation.
 func (r *mutationResolver) CreatePost(ctx context.Context, input postInput) (*models.Post, error) {
 	cUser := models.GetCurrentUserFromGqlContext(ctx)
@@ -471,11 +493,11 @@ func (r *mutationResolver) UpdatePostStatus(ctx context.Context, input UpdatePos
 	return &post, nil
 }
 
-func (r *mutationResolver) AddMeAsPotentialProvider(ctx context.Context, postID string) (*models.Post, error) {
+func (r *mutationResolver) AddMeAsPotentialProvider(ctx context.Context, input PotentialProviderInput) (*models.Post, error) {
 	cUser := models.GetCurrentUserFromGqlContext(ctx)
 
 	var post models.Post
-	if err := post.FindByUUIDForCurrentUser(postID, cUser); err != nil {
+	if err := post.FindByUUIDForCurrentUser(input.PostID, cUser); err != nil {
 		return nil, reportError(ctx, err, "AddMeAsPotentialProvider.FindPost")
 	}
 
@@ -486,10 +508,24 @@ func (r *mutationResolver) AddMeAsPotentialProvider(ctx context.Context, postID 
 	}
 
 	var provider models.PotentialProvider
-	if err := provider.NewWithPostUUID(postID, cUser.ID); err != nil {
+	if err := provider.NewWithPostUUID(input.PostID, cUser.ID); err != nil {
 		return nil, reportError(ctx, errors.New("error preparing potential provider: "+err.Error()),
 			"AddMeAsPotentialProvider")
 	}
+
+	deliveryAfter, err := time.Parse(domain.DateFormat, input.DeliveryAfter)
+	if err != nil {
+		return nil, reportError(ctx, errors.New("error preparing potential provider's deliveryAfter date: "+err.Error()),
+			"AddMeAsPotentialProvider.DeliveryAfter")
+	}
+	provider.DeliveryAfter = deliveryAfter
+
+	deliveryBefore, err := time.Parse(domain.DateFormat, input.DeliveryAfter)
+	if err != nil {
+		return nil, reportError(ctx, errors.New("error preparing potential provider's deliveryBefore date: "+err.Error()),
+			"AddMeAsPotentialProvider.DeliveryBefore")
+	}
+	provider.DeliveryBefore = deliveryBefore
 
 	if err := provider.Create(); err != nil {
 		return nil, reportError(ctx, errors.New("error creating potential provider: "+err.Error()),

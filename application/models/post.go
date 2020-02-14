@@ -328,14 +328,19 @@ func (p *Post) SetProviderWithStatus(status PostStatus, providerID *string) erro
 
 // GetPotentialProviders returns the User objects associated with the Post's
 // PotentialProviders
-func (p *Post) GetPotentialProviders() (Users, error) {
+func (p *Post) GetPotentialProviders() (PotentialProviders, error) {
 	if p.Type != PostTypeRequest {
-		return Users{}, nil
+		return PotentialProviders{}, nil
 	}
 
 	providers := PotentialProviders{}
-	users, err := providers.FindUsersByPostID(p.ID)
-	return users, err
+	if err := DB.Eager("User").Where("post_id = ?", p.ID).All(&providers); err != nil {
+		if domain.IsOtherThanNoRows(err) {
+			return PotentialProviders{}, fmt.Errorf("failed to find potential_provider record for post %d, %s",
+				p.ID, err)
+		}
+	}
+	return providers, nil
 }
 
 // DestroyPotentialProviders destroys all the PotentialProvider records

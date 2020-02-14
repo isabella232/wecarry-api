@@ -298,7 +298,7 @@ type PostResolver interface {
 	CreatedBy(ctx context.Context, obj *models.Post) (*PublicProfile, error)
 	Receiver(ctx context.Context, obj *models.Post) (*PublicProfile, error)
 	Provider(ctx context.Context, obj *models.Post) (*PublicProfile, error)
-	PotentialProviders(ctx context.Context, obj *models.Post) ([]PublicProfile, error)
+	PotentialProviders(ctx context.Context, obj *models.Post) ([]potentialProvider, error)
 	Organization(ctx context.Context, obj *models.Post) (*models.Organization, error)
 
 	Description(ctx context.Context, obj *models.Post) (*string, error)
@@ -316,9 +316,7 @@ type PostResolver interface {
 	IsEditable(ctx context.Context, obj *models.Post) (bool, error)
 }
 type PotentialProviderResolver interface {
-	User(ctx context.Context, obj *models.PotentialProvider) (*PublicProfile, error)
-	DeliveryAfter(ctx context.Context, obj *models.PotentialProvider) (string, error)
-	DeliveryBefore(ctx context.Context, obj *models.PotentialProvider) (string, error)
+	User(ctx context.Context, obj *potentialProvider) (*PublicProfile, error)
 }
 type QueryResolver interface {
 	Users(ctx context.Context) ([]models.User, error)
@@ -1655,7 +1653,7 @@ type Post {
     receiver: PublicProfile
     "Profile of the user that is the provider for this post. For offers, this is the same as ` + "`" + `createdBy` + "`" + `."
     provider: PublicProfile
-    potentialProviders: [PublicProfile!]
+    potentialProviders: [PotentialProvider!]
     "Organization associated with this post."
     organization: Organization
     "Short description of item"
@@ -4961,10 +4959,10 @@ func (ec *executionContext) _Post_potentialProviders(ctx context.Context, field 
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.([]PublicProfile)
+	res := resTmp.([]potentialProvider)
 	rctx.Result = res
 	ctx = ec.Tracer.StartFieldChildExecution(ctx)
-	return ec.marshalOPublicProfile2ᚕgithubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐPublicProfile(ctx, field.Selections, res)
+	return ec.marshalOPotentialProvider2ᚕgithubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐpotentialProvider(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Post_organization(ctx context.Context, field graphql.CollectedField, obj *models.Post) (ret graphql.Marshaler) {
@@ -5609,7 +5607,7 @@ func (ec *executionContext) _Post_visibility(ctx context.Context, field graphql.
 	return ec.marshalNPostVisibility2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋmodelsᚐPostVisibility(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _PotentialProvider_user(ctx context.Context, field graphql.CollectedField, obj *models.PotentialProvider) (ret graphql.Marshaler) {
+func (ec *executionContext) _PotentialProvider_user(ctx context.Context, field graphql.CollectedField, obj *potentialProvider) (ret graphql.Marshaler) {
 	ctx = ec.Tracer.StartFieldExecution(ctx, field)
 	defer func() {
 		if r := recover(); r != nil {
@@ -5646,7 +5644,7 @@ func (ec *executionContext) _PotentialProvider_user(ctx context.Context, field g
 	return ec.marshalNPublicProfile2ᚖgithubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐPublicProfile(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _PotentialProvider_deliveryAfter(ctx context.Context, field graphql.CollectedField, obj *models.PotentialProvider) (ret graphql.Marshaler) {
+func (ec *executionContext) _PotentialProvider_deliveryAfter(ctx context.Context, field graphql.CollectedField, obj *potentialProvider) (ret graphql.Marshaler) {
 	ctx = ec.Tracer.StartFieldExecution(ctx, field)
 	defer func() {
 		if r := recover(); r != nil {
@@ -5659,13 +5657,13 @@ func (ec *executionContext) _PotentialProvider_deliveryAfter(ctx context.Context
 		Object:   "PotentialProvider",
 		Field:    field,
 		Args:     nil,
-		IsMethod: true,
+		IsMethod: false,
 	}
 	ctx = graphql.WithResolverContext(ctx, rctx)
 	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.PotentialProvider().DeliveryAfter(rctx, obj)
+		return obj.DeliveryAfter, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -5683,7 +5681,7 @@ func (ec *executionContext) _PotentialProvider_deliveryAfter(ctx context.Context
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _PotentialProvider_deliveryBefore(ctx context.Context, field graphql.CollectedField, obj *models.PotentialProvider) (ret graphql.Marshaler) {
+func (ec *executionContext) _PotentialProvider_deliveryBefore(ctx context.Context, field graphql.CollectedField, obj *potentialProvider) (ret graphql.Marshaler) {
 	ctx = ec.Tracer.StartFieldExecution(ctx, field)
 	defer func() {
 		if r := recover(); r != nil {
@@ -5696,13 +5694,13 @@ func (ec *executionContext) _PotentialProvider_deliveryBefore(ctx context.Contex
 		Object:   "PotentialProvider",
 		Field:    field,
 		Args:     nil,
-		IsMethod: true,
+		IsMethod: false,
 	}
 	ctx = graphql.WithResolverContext(ctx, rctx)
 	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.PotentialProvider().DeliveryBefore(rctx, obj)
+		return obj.DeliveryBefore, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -10238,7 +10236,7 @@ func (ec *executionContext) _Post(ctx context.Context, sel ast.SelectionSet, obj
 
 var potentialProviderImplementors = []string{"PotentialProvider"}
 
-func (ec *executionContext) _PotentialProvider(ctx context.Context, sel ast.SelectionSet, obj *models.PotentialProvider) graphql.Marshaler {
+func (ec *executionContext) _PotentialProvider(ctx context.Context, sel ast.SelectionSet, obj *potentialProvider) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.RequestContext, sel, potentialProviderImplementors)
 
 	out := graphql.NewFieldSet(fields)
@@ -10262,33 +10260,15 @@ func (ec *executionContext) _PotentialProvider(ctx context.Context, sel ast.Sele
 				return res
 			})
 		case "deliveryAfter":
-			field := field
-			out.Concurrently(i, func() (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._PotentialProvider_deliveryAfter(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
-				}
-				return res
-			})
+			out.Values[i] = ec._PotentialProvider_deliveryAfter(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
 		case "deliveryBefore":
-			field := field
-			out.Concurrently(i, func() (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._PotentialProvider_deliveryBefore(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
-				}
-				return res
-			})
+			out.Values[i] = ec._PotentialProvider_deliveryBefore(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -11635,6 +11615,10 @@ func (ec *executionContext) marshalNPostVisibility2githubᚗcomᚋsilinternation
 	return v
 }
 
+func (ec *executionContext) marshalNPotentialProvider2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐpotentialProvider(ctx context.Context, sel ast.SelectionSet, v potentialProvider) graphql.Marshaler {
+	return ec._PotentialProvider(ctx, sel, &v)
+}
+
 func (ec *executionContext) unmarshalNPotentialProviderInput2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐPotentialProviderInput(ctx context.Context, v interface{}) (PotentialProviderInput, error) {
 	return ec.unmarshalInputPotentialProviderInput(ctx, v)
 }
@@ -12357,6 +12341,46 @@ func (ec *executionContext) marshalOPostVisibility2ᚖgithubᚗcomᚋsilinternat
 	return v
 }
 
+func (ec *executionContext) marshalOPotentialProvider2ᚕgithubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐpotentialProvider(ctx context.Context, sel ast.SelectionSet, v []potentialProvider) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		rctx := &graphql.ResolverContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithResolverContext(ctx, rctx)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNPotentialProvider2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐpotentialProvider(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+	return ret
+}
+
 func (ec *executionContext) unmarshalOPreferredLanguage2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐPreferredLanguage(ctx context.Context, v interface{}) (PreferredLanguage, error) {
 	var res PreferredLanguage
 	return res, res.UnmarshalGQL(v)
@@ -12407,46 +12431,6 @@ func (ec *executionContext) marshalOPreferredWeightUnit2ᚖgithubᚗcomᚋsilint
 
 func (ec *executionContext) marshalOPublicProfile2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐPublicProfile(ctx context.Context, sel ast.SelectionSet, v PublicProfile) graphql.Marshaler {
 	return ec._PublicProfile(ctx, sel, &v)
-}
-
-func (ec *executionContext) marshalOPublicProfile2ᚕgithubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐPublicProfile(ctx context.Context, sel ast.SelectionSet, v []PublicProfile) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		rctx := &graphql.ResolverContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithResolverContext(ctx, rctx)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalNPublicProfile2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐPublicProfile(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
-	return ret
 }
 
 func (ec *executionContext) marshalOPublicProfile2ᚖgithubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐPublicProfile(ctx context.Context, sel ast.SelectionSet, v *PublicProfile) graphql.Marshaler {

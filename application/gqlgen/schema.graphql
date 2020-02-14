@@ -157,7 +157,7 @@ type Post {
     receiver: PublicProfile
     "Profile of the user that is the provider for this post. For offers, this is the same as `createdBy`."
     provider: PublicProfile
-    potentialProviders: [PublicProfile!]
+    potentialProviders: [PotentialProvider!]
     "Organization associated with this post."
     organization: Organization
     "Short description of item"
