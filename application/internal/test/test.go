@@ -133,7 +133,7 @@ func CreatePostFixtures(tx *pop.Connection, n int, createFiles bool) models.Post
 		posts[i].Type = models.PostTypeRequest
 		posts[i].Status = models.PostStatusOpen
 		posts[i].URL = nulls.NewString("https://www.example.com/" + strconv.Itoa(i))
-		posts[i].Kilograms = float64(i) * 0.1
+		posts[i].Kilograms = nulls.NewFloat64(float64(i) * 0.1)
 		posts[i].Visibility = models.PostVisibilitySame
 
 		if createFiles {
@@ -216,22 +216,45 @@ type PotentialProvidersFixtures struct {
 }
 
 // CreatePotentialProviderFixtures generates five PotentialProvider records for testing.
-// Four User and three Post fixtures will also be created.  The Posts will
+// Five User and three Post fixtures will also be created.  The Posts will
 // all be created by the first user.
 // The first Post will have all but the first user as a potential provider.
 // The second Post will have the last two users as potential providers.
-// The third Post won't have any potential providers
+// The third Post won't have any potential providers.
+// The Fifth User will be with a different Organization.
 func CreatePotentialProvidersFixtures(tx *pop.Connection) PotentialProvidersFixtures {
-	uf := CreateUserFixtures(tx, 4)
+	uf := CreateUserFixtures(tx, 5)
 	posts := CreatePostFixtures(tx, 3, false)
 	providers := models.PotentialProviders{}
 
 	for i, p := range posts[:2] {
-		for _, u := range uf.Users[i+1:] {
+		for _, u := range uf.Users[i+1 : 4] {
 			c := models.PotentialProvider{PostID: p.ID, UserID: u.ID}
 			c.Create()
 			providers = append(providers, c)
 		}
+	}
+
+	// Put the last user in a new org
+	org2 := models.Organization{
+		Name:       "Extra Org",
+		AuthType:   models.AuthTypeGoogle,
+		AuthConfig: "{}",
+		UUID:       domain.GetUUID(),
+	}
+	MustCreate(tx, &org2)
+
+	users := uf.Users
+
+	// Switch User4's org to org2
+	uo, err := users[4].FindUserOrganization(uf.Organization)
+	if err != nil {
+		panic("Couldn't find User4's UserOrg: " + err.Error())
+	}
+
+	uo.OrganizationID = org2.ID
+	if err := tx.UpdateColumns(&uo, "organization_id"); err != nil {
+		panic("Couldn't change User4's UserOrg: " + err.Error())
 	}
 
 	return PotentialProvidersFixtures{

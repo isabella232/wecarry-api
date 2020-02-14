@@ -1537,12 +1537,13 @@ enum PostSize {
     XLARGE
 }
 
-"""
-Visibility for Posts, ALL organizations, TRUSTED organizations, or SAME organization only
-"""
+"Visibility for Posts, ALL organizations, TRUSTED organizations, or SAME organization only"
 enum PostVisibility {
+    "Visible to all users from all organizations in the system"
     ALL
+    "Visible to users from all organizations trusted by the Post creator's organization"
     TRUSTED
+    "Visible only to users from the same organization as the Post creator"
     SAME
 }
 
@@ -1567,10 +1568,15 @@ type UserPreferences {
     weightUnit: String
 }
 
+"Update User profile information. If ID is not specified, the authenticated user is assumed."
 input UpdateUserInput {
     id: ID
     nickname: String
+    "File ID of avatar photo. If omitted or ` + "`" + `null` + "`" + `, the photo is removed from the profile."
     photoID: String
+    """
+    Specify the user's "home" location. If omitted or ` + "`" + `null` + "`" + `, the location is removed from the profile.
+    """
     location: LocationInput
     preferences: UpdateUserPreferencesInput
 }
@@ -1610,27 +1616,48 @@ enum PostType {
 type Post {
     id: ID!
     type: PostType!
+    "Profile of the user that created this post."
     createdBy: PublicProfile!
+    "Profile of the user that is receiver of this post. For requests, this is the same as ` + "`" + `createdBy` + "`" + `."
     receiver: PublicProfile
+    "Profile of the user that is the provider for this post. For offers, this is the same as ` + "`" + `createdBy` + "`" + `."
     provider: PublicProfile
     potentialProviders: [PublicProfile!]
+    "Organization associated with this post."
     organization: Organization
+    "Short description of item"
     title: String!
+    "Optional, longer description of the item."
     description: String
+    "Geographic location where item is needed"
     destination: Location!
+    "Date (yyyy-mm-dd) before which the item will be needed. The record may be hidden or removed after this date."
     neededBefore: String
+    "Optional geographic location where the item can be picked up, purchased, or otherwise obtained"
     origin: Location
+    "Broad category of the size of item"
     size: PostSize!
+    "Status of the post. Use mutation ` + "`" + `updatePostStatus` + "`" + ` to change the status."
     status: PostStatus!
+    "List of message threads associated with this post"
     threads: [Thread!]!
+    "Date and time this post was created"
     createdAt: Time!
+    "Date and time this post was last updated"
     updatedAt: Time!
+    "Optional URL to further describe or point to detail about the item"
     url: String
+    "Optional weight of the item, measured in kilograms"
     kilograms: Float
+    "Photo of the item"
     photo: File
+    "List of attached files. Does not include the post photo."
     files: [File!]!
+    "Meeting associated with this post. Affects visibility of the post."
     meeting: Meeting
+    "Dynamically set to indicate if the current user is allowed to edit this post using the ` + "`" + `updatePost` + "`" + ` mutation"
     isEditable: Boolean!
+    "Visibility restrictions for this post"
     visibility: PostVisibility!
 }
 
@@ -1717,32 +1744,64 @@ type Message {
 }
 
 input CreatePostInput {
+    "ID of associated Organization. Affects visibility of the post, see also the ` + "`" + `visibility` + "`" + ` field."
     orgID: String!
     type: PostType!
+    "Short description, limited to 255 characters"
     title: String!
+    "Optional, longer description, limited to 4096 characters"
     description: String
+    "Geographic location where item is needed"
     destination: LocationInput!
+    "Date (yyyy-mm-dd) before which the item will be needed. The record may be hidden or removed after this date."
     neededBefore: String
+    "Optional geographic location where the item can be picked up, purchased, or otherwise obtained"
     origin: LocationInput
+    "Broad category of the size of item"
     size: PostSize!
+    "Optional URL to further describe or point to detail about the item"
     url: String
+    "Optional weight of the item, measured in kilograms"
     kilograms: Float
+    "Optional photo ` + "`" + `file` + "`" + ` ID. First upload a file using the ` + "`" + `/upload` + "`" + ` REST API and then submit its ID here."
     photoID: ID
+    "Optional meeting ID. Affects visibility of the post."
     meetingID: ID
+    "Visibility restrictions for this post"
     visibility: PostVisibility
 }
 
 input UpdatePostInput {
+    "ID of the post to update"
     id: ID!
+    "Short description, limited to 255 characters. If omitted or ` + "`" + `null` + "`" + `, no change is made."
     title: String
+    "Longer description, limited to 4096 characters. If omitted or ` + "`" + `null` + "`" + `, the description is removed"
     description: String
+    "Geographic location where item is needed. If omitted or ` + "`" + `null` + "`" + `, no change is made."
     destination: LocationInput
+    """
+    Date (yyyy-mm-dd) before which the item will be needed. The record may be hidden or removed after this date. If
+    omitted or ` + "`" + `null` + "`" + `, the date is removed.
+    """
     neededBefore: String
+    """
+    Optional geographic location where the item can be picked up, purchased, or otherwise obtained. If omitted or
+    ` + "`" + `null` + "`" + `, the origin location is removed.
+    """
     origin: LocationInput
+    "Broad category of the size of item. If omitted or ` + "`" + `null` + "`" + `, no change is made."
     size: PostSize
+    "Optional URL to further describe or point to detail about the item. If omitted or ` + "`" + `null` + "`" + `, the URL is removed."
     url: String
+    "Optional weight of the item, measured in kilograms. If omitted or ` + "`" + `null` + "`" + `, the value is removed."
     kilograms: Float
+    """
+    Optional photo ` + "`" + `file` + "`" + ` ID. First upload a file using the ` + "`" + `/upload` + "`" + ` REST API and then submit its ID here. Any
+    previously attached photo will be deleted. If omitted or ` + "`" + `null` + "`" + `, no photo will be attached to this post.
+    """
     photoID: ID
+    "Visibility restrictions for this post. If omitted or ` + "`" + `null` + "`" + `, the visibility is set to ` + "`" + `ALL` + "`" + `."
     visibility: PostVisibility
 }
 
@@ -1787,6 +1846,7 @@ input SetThreadLastViewedAtInput {
     time: Time!
 }
 
+"Describes a Geographic location"
 type Location {
     description: String!
     # Country, ISO 3166-1 Alpha-2 code
@@ -1795,6 +1855,7 @@ type Location {
     longitude: Float
 }
 
+"Specify a Geographic location"
 input LocationInput {
     description: String!
     # Country, ISO 3166-1 Alpha-2 code

@@ -633,6 +633,78 @@ func (ms *ModelSuite) TestUser_CanUpdatePostStatus() {
 	}
 }
 
+func (ms *ModelSuite) TestUser_CanViewPost() {
+	t := ms.T()
+
+	f := CreateFixturesForUserCanViewPost(ms)
+	users := f.Users
+	posts := f.Posts
+
+	tests := []struct {
+		name      string
+		post      Post
+		user      User
+		newStatus PostStatus
+		want      bool
+	}{
+		{
+			name: "Creator",
+			post: posts[0],
+			user: users[0],
+			want: true,
+		},
+		{
+			name: "SuperAdmin",
+			post: posts[0],
+			user: users[3],
+			want: true,
+		},
+		{
+			name: "User's Org",
+			post: posts[0],
+			user: users[1],
+			want: true,
+		},
+		{
+			name: "All with User's untrusted Org",
+			post: posts[2],
+			user: users[0],
+			want: true,
+		},
+		{
+			name: "Trusted with User's trusted Org",
+			post: posts[3],
+			user: users[1],
+			want: true,
+		},
+		{
+			name: "Trusted with User's untrusted Org",
+			post: posts[3],
+			user: users[0],
+			want: false,
+		},
+		{
+			name: "Same with User's untrusted Org",
+			post: posts[4],
+			user: users[0],
+			want: false,
+		},
+		{
+			name: "Same with User's trusted Org",
+			post: posts[4],
+			user: users[1],
+			want: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ms.Equal(test.want, test.user.canViewPost(test.post),
+				"incorrect result")
+		})
+	}
+}
+
 func (ms *ModelSuite) TestUser_CanViewOrganization() {
 	t := ms.T()
 
@@ -795,6 +867,52 @@ func (ms *ModelSuite) TestUser_AttachPhoto() {
 			ms.NoError(err, "unexpected error")
 			ms.Equal(tt.want.UUID.String(), got.UUID.String(), "wrong file returned")
 			ms.Equal(true, got.Linked, "new user photo file is not marked as linked")
+			if tt.oldImage != nil {
+				ms.Equal(false, tt.oldImage.Linked, "old user photo file is not marked as unlinked")
+			}
+		})
+	}
+}
+
+func (ms *ModelSuite) TestUser_RemovePhoto() {
+	uf := createUserFixtures(ms.DB, 2)
+	users := uf.Users
+
+	files := createFileFixtures(2)
+	users[1].PhotoFileID = nulls.NewInt(files[0].ID)
+	ms.NoError(ms.DB.UpdateColumns(&users[1], "photo_file_id"))
+
+	tests := []struct {
+		name     string
+		user     User
+		oldImage *File
+		want     File
+		wantErr  string
+	}{
+		{
+			name: "no file",
+			user: users[0],
+		},
+		{
+			name:     "has a file",
+			user:     users[1],
+			oldImage: &files[0],
+		},
+		{
+			name:    "bad ID",
+			user:    User{},
+			wantErr: "invalid User ID",
+		},
+	}
+	for _, tt := range tests {
+		ms.T().Run(tt.name, func(t *testing.T) {
+			err := tt.user.RemovePhoto()
+			if tt.wantErr != "" {
+				ms.Error(err, "did not get expected error")
+				ms.Contains(err.Error(), tt.wantErr)
+				return
+			}
+			ms.NoError(err, "unexpected error")
 			if tt.oldImage != nil {
 				ms.Equal(false, tt.oldImage.Linked, "old user photo file is not marked as unlinked")
 			}
@@ -975,29 +1093,76 @@ func (ms *ModelSuite) TestUser_SetLocation() {
 		},
 	}
 
-	err := user.SetLocation(locationFixtures[0])
-	ms.NoError(err, "unexpected error from user.SetLocation()")
+	tests := []struct {
+		name        string
+		newLocation Location
+		wantNil     bool
+	}{
+		{
+			name:        "previously unset",
+			newLocation: locationFixtures[0],
+		},
+		{
+			name:        "overwrite location with new info",
+			newLocation: locationFixtures[1],
+		},
+	}
 
-	locationFromDB, err := user.GetLocation()
-	ms.NoError(err, "unexpected error from user.GetLocation()")
+	for _, test := range tests {
+		ms.T().Run(test.name, func(t *testing.T) {
+			err := user.SetLocation(test.newLocation)
+			ms.NoError(err, "unexpected error from user.SetLocation()")
 
-	locationFixtures[0].ID = locationFromDB.ID
-	ms.Equal(locationFixtures[0], *locationFromDB, "user location data doesn't match new location")
+			locationFromDB, err := user.GetLocation()
+			ms.NoError(err, "unexpected error from user.GetLocation()")
 
-	err = user.SetLocation(locationFixtures[1])
-	ms.NoError(err, "unexpected error from user.SetLocation()")
+			if test.wantNil {
+				ms.Nil(locationFromDB)
+			} else {
+				test.newLocation.ID = locationFromDB.ID
+				ms.Equal(test.newLocation, *locationFromDB, "user location data doesn't match new location")
+			}
+		})
+	}
+}
 
-	locationFromDB, err = user.GetLocation()
-	ms.NoError(err, "unexpected error from user.GetLocation()")
-	ms.Equal(locationFixtures[0].ID, locationFromDB.ID,
-		"Location ID doesn't match -- location record was probably not reused")
+func (ms *ModelSuite) TestUser_RemoveLocation() {
+	uf := createUserFixtures(ms.DB, 2)
+	uf.Users[0].LocationID = nulls.Int{}
+	ms.NoError(ms.DB.Save(&uf.Users[0]))
 
-	locationFixtures[1].ID = locationFromDB.ID
-	ms.Equal(locationFixtures[1], *locationFromDB, "user location data doesn't match after update")
+	tests := []struct {
+		name    string
+		user    User
+		wantNil bool
+	}{
+		{
+			name: "user has no location",
+			user: uf.Users[0],
+		},
+		{
+			name: "user has a location",
+			user: uf.Users[1],
+		},
+	}
 
-	// These are redundant checks, but here to document the fact that a null overwrites previous data.
-	ms.False(locationFromDB.Latitude.Valid)
-	ms.False(locationFromDB.Longitude.Valid)
+	for _, tt := range tests {
+		ms.T().Run(tt.name, func(t *testing.T) {
+			id := tt.user.LocationID
+			fmt.Print(id)
+			err := tt.user.RemoveLocation()
+			ms.NoError(err, "unexpected error from user.RemoveLocation()")
+
+			locationFromDB, err := tt.user.GetLocation()
+			ms.NoError(err, "unexpected error from user.GetLocation()")
+			ms.Nil(locationFromDB)
+
+			loc := Location{}
+			err = ms.DB.Find(&loc, id)
+			ms.Error(err)
+			ms.Equal("sql: no rows in result set", err.Error())
+		})
+	}
 }
 
 func (ms *ModelSuite) TestUser_UnreadMessageCount() {

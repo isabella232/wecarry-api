@@ -27,7 +27,7 @@ func (as *ActionSuite) Test_AddMeAsPotentialProvider() {
 	want := []PotentialProvider{{ID: f.Users[1].UUID.String(), Nickname: f.Users[1].Nickname}}
 	as.Equal(want, resp.Post.PotentialProviders, "incorrect potential providers")
 
-	// Add one to Post with two alread
+	// Add one to Post with two already
 	query = fmt.Sprintf(qTemplate, posts[1].UUID.String())
 
 	err = as.testGqlQuery(query, f.Users[1].Nickname, &resp)
@@ -41,6 +41,25 @@ func (as *ActionSuite) Test_AddMeAsPotentialProvider() {
 		{ID: f.Users[1].UUID.String(), Nickname: f.Users[1].Nickname},
 	}
 	as.Equal(want, resp.Post.PotentialProviders, "incorrect potential providers")
+
+	// Adding a repeat gives an error
+	query = fmt.Sprintf(qTemplate, posts[1].UUID.String())
+
+	err = as.testGqlQuery(query, f.Users[1].Nickname, &resp)
+	as.Error(err, "expected an error (unique together) but didn't get one")
+
+	want = []PotentialProvider{
+		{ID: f.Users[2].UUID.String(), Nickname: f.Users[2].Nickname},
+		{ID: f.Users[3].UUID.String(), Nickname: f.Users[3].Nickname},
+		{ID: f.Users[1].UUID.String(), Nickname: f.Users[1].Nickname},
+	}
+	as.Equal(want, resp.Post.PotentialProviders, "incorrect potential providers")
+
+	// Adding one for a different Org gives an error
+	err = as.testGqlQuery(query, f.Users[4].Nickname, &resp)
+	as.Error(err, "expected an error (unauthorized) but didn't get one")
+	as.Equal(want, resp.Post.PotentialProviders, "incorrect potential providers")
+
 }
 
 func (as *ActionSuite) Test_RemoveMeAsPotentialProvider() {

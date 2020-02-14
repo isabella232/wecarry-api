@@ -126,6 +126,8 @@
   translation: We had a problem setting the destination to update that request or offer.
 - id: UpdatePost.SetOrigin
   translation: We had a problem setting the origin to update that request or offer.
+- id: UpdatePost.RemoveOrigin
+  translation: We had a problem removing the origin from that request or offer.
 - id: UpdatePostStatus
   translation: We had a problem changing the status of that request or offer.
 - id: UpdatePostStatus.FindPost
@@ -136,6 +138,10 @@
   translation: We had a problem finding that request.
 - id: AddMeAsPotentialProvider
   translation: We had a problem registering your offer to fulfill a request.
+- id: AddMeAsPotentialProvider.FindPost
+  translation: We had a problem finding that request to register your offer to fulfill it.
+- id: AddMeAsPotentialProvider.BadPostStatus
+  translation: That request has a status that does not allow offers.
 - id: RemoveMeAsPotentialProvider
   translation: We had a problem cancelling your offer to fufill a request.
 - id: RemoveMeAsPotentialProvider.NotAuthorized
@@ -184,8 +190,8 @@
   translation: We had a problem finding the user for the profile update.
 - id: UpdateUser.Unauthorized
   translation: You are not allowed to update that user profile.
-- id: UpdateUser.PhotoNotFound
-  translation: We had a problem finding the photo to update the user profile.
+- id: UpdateUser.UpdatePhoto
+  translation: We had a problem changing the photo on the user profile.
 - id: UpdateUser.SetLocationError
   translation: We had a problem setting the location on the user profile.
 - id: UpdateUser

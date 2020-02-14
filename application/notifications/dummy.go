@@ -97,7 +97,7 @@ func (t *DummyEmailService) Send(msg Message) error {
 	_, ok := dummyTemplates[msg.Template]
 	if !ok {
 		errMsg := fmt.Sprintf("invalid template name: %s", msg.Template)
-		domain.ErrLogger.Print(errMsg)
+		domain.ErrLogger.Printf(errMsg)
 		return errors.New(errMsg)
 	}
 
@@ -105,12 +105,12 @@ func (t *DummyEmailService) Send(msg Message) error {
 	bodyBuf := &bytes.Buffer{}
 	if err := eR.HTML(eTemplate).Render(bodyBuf, msg.Data); err != nil {
 		errMsg := "error rendering message body - " + err.Error()
-		domain.ErrLogger.Print(errMsg)
+		domain.ErrLogger.Printf(errMsg)
 		return errors.New(errMsg)
 	}
 
-	domain.Logger.Printf("dummy message subject: %s, recipient: %s, data: %+v",
-		msg.Subject, msg.ToName, msg.Data)
+	domain.Logger.Printf("dummy message subject: %s, recipient: %s",
+		msg.Subject, msg.ToName)
 
 	t.sentMessages = append(t.sentMessages,
 		dummyMessage{
