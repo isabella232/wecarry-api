@@ -529,7 +529,7 @@ func (r *mutationResolver) AddMeAsPotentialProvider(ctx context.Context, input P
 	cUser := models.GetCurrentUserFromGqlContext(ctx)
 
 	var post models.Post
-	if err := post.FindByUUIDForCurrentUser(postID, cUser); err != nil {
+	if err := post.FindByUUIDForCurrentUser(input.PostID, cUser); err != nil {
 		return nil, domain.ReportError(ctx, err, "AddMeAsPotentialProvider.FindPost")
 	}
 
@@ -540,21 +540,21 @@ func (r *mutationResolver) AddMeAsPotentialProvider(ctx context.Context, input P
 	}
 
 	var provider models.PotentialProvider
-	if err := provider.NewWithPostUUID(postID, cUser.ID); err != nil {
+	if err := provider.NewWithPostUUID(input.PostID, cUser.ID); err != nil {
 		return nil, domain.ReportError(ctx, errors.New("error preparing potential provider: "+err.Error()),
 			"AddMeAsPotentialProvider")
 	}
 
 	deliveryAfter, err := time.Parse(domain.DateFormat, input.DeliveryAfter)
 	if err != nil {
-		return nil, reportError(ctx, errors.New("error preparing potential provider's deliveryAfter date: "+err.Error()),
+		return nil, domain.ReportError(ctx, errors.New("error preparing potential provider's deliveryAfter date: "+err.Error()),
 			"AddMeAsPotentialProvider.DeliveryAfter")
 	}
 	provider.DeliveryAfter = deliveryAfter
 
 	deliveryBefore, err := time.Parse(domain.DateFormat, input.DeliveryAfter)
 	if err != nil {
-		return nil, reportError(ctx, errors.New("error preparing potential provider's deliveryBefore date: "+err.Error()),
+		return nil, domain.ReportError(ctx, errors.New("error preparing potential provider's deliveryBefore date: "+err.Error()),
 			"AddMeAsPotentialProvider.DeliveryBefore")
 	}
 	provider.DeliveryBefore = deliveryBefore
