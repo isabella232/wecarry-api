@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gobuffalo/buffalo"
 	"github.com/gobuffalo/nulls"
 	"github.com/gobuffalo/pop"
 	"github.com/gobuffalo/validate"
 	"github.com/gobuffalo/validate/validators"
 	"github.com/gofrs/uuid"
 	"github.com/pkg/errors"
+
 	"github.com/silinternational/wecarry-api/domain"
 )
 
@@ -23,6 +25,7 @@ type Meeting struct {
 	MoreInfoURL nulls.String `json:"more_info_url" db:"more_info_url"`
 	StartDate   time.Time    `json:"start_date" db:"start_date"`
 	EndDate     time.Time    `json:"end_date" db:"end_date"`
+	InviteCode  nulls.UUID   `json:"invite_code" db:"invite_code"`
 	CreatedAt   time.Time    `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time    `json:"updated_at" db:"updated_at"`
 	CreatedByID int          `json:"created_by_id" db:"created_by_id"`
@@ -32,7 +35,7 @@ type Meeting struct {
 	CreatedBy User     `belongs_to:"users"`
 	ImageFile File     `belongs_to:"files"`
 	Location  Location `belongs_to:"locations"`
-	Posts     Posts    `has_many:"posts" fk_id:"id" order_by:"updated_at desc"`
+	Posts     Posts    `has_many:"posts" fk_id:"meeting_id" order_by:"updated_at desc"`
 }
 
 // String is not required by pop and may be deleted
@@ -164,6 +167,22 @@ func (m *Meetings) FindRecent(timeInFocus time.Time) error {
 	return nil
 }
 
+func (m *Meeting) FindByInviteCode(code string) error {
+	if code == "" {
+		return errors.New("error finding meeting: invite_code must not be blank")
+	}
+
+	if err := DB.Where("invite_code = ?", code).First(m); err != nil {
+		return fmt.Errorf("error finding meeting by invite_code: %s", err.Error())
+	}
+
+	if err := DB.Load(m, "ImageFile"); err != nil {
+		domain.ErrLogger.Printf("error loading meeting image file: " + err.Error())
+	}
+
+	return nil
+}
+
 // AttachImage assigns a previously-stored File to this Meeting as its image. Parameter `fileID` is the UUID
 // of the image to attach.
 func (m *Meeting) AttachImage(fileID string) (File, error) {
@@ -260,4 +279,73 @@ func (m *Meeting) CanUpdate(user User) bool {
 	}
 
 	return user.ID == m.CreatedByID
+}
+
+// GetPosts return all associated Posts
+func (m *Meeting) GetPosts() ([]Post, error) {
+	if err := DB.Load(m, "Posts"); err != nil {
+		return nil, fmt.Errorf("error getting posts for meeting id %v ... %v", m.ID, err)
+	}
+
+	return m.Posts, nil
+}
+
+// Invites returns all of the MeetingInvites for this Meeting. Only the meeting creator and organizers are authorized.
+func (m *Meeting) Invites(ctx buffalo.Context) (MeetingInvites, error) {
+	i := MeetingInvites{}
+	if m == nil {
+		return i, nil
+	}
+	currentUser := GetCurrentUser(ctx)
+	if currentUser.ID != m.CreatedByID && !currentUser.isMeetingOrganizer(ctx, *m) && !currentUser.isSuperAdmin() {
+		return i, nil
+	}
+	if err := DB.Where("meeting_id = ?", m.ID).All(&i); err != nil {
+		return i, err
+	}
+	return i, nil
+}
+
+// Participants returns all of the MeetingParticipants for this Meeting. Only the meeting creator and organizers are
+// authorized.
+func (m *Meeting) Participants(ctx buffalo.Context) (MeetingParticipants, error) {
+	p := MeetingParticipants{}
+	if m == nil {
+		return p, nil
+	}
+	currentUser := GetCurrentUser(ctx)
+	if currentUser.ID != m.CreatedByID && !currentUser.isMeetingOrganizer(ctx, *m) && !currentUser.isSuperAdmin() {
+		return p, nil
+	}
+	if err := DB.Where("meeting_id = ?", m.ID).All(&p); err != nil {
+		return p, err
+	}
+	return p, nil
+}
+
+// Organizers returns all of the users who are organizers for this Meeting. No authorization is checked, so
+// any queries should render this as a PublicProfile to limit field visibility.
+func (m *Meeting) Organizers(ctx buffalo.Context) (Users, error) {
+	u := Users{}
+	if m == nil {
+		return u, nil
+	}
+	if err := DB.
+		Select("users.id", "users.uuid", "nickname", "photo_file_id", "auth_photo_url").
+		Where("meeting_participants.is_organizer=true").
+		Where("meeting_participants.meeting_id=?", m.ID).
+		Join("meeting_participants", "meeting_participants.user_id=users.id").
+		All(&u); err != nil {
+
+		return u, err
+	}
+	return u, nil
+}
+
+func (m *Meeting) RemoveInvite(ctx buffalo.Context, email string) error {
+	var invite MeetingInvite
+	if err := invite.FindByMeetingIDAndEmail(m.ID, email); err != nil {
+		return err
+	}
+	return invite.Destroy()
 }

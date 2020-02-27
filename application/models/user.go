@@ -1,13 +1,14 @@
 package models
 
 import (
-	"crypto/md5"
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/gobuffalo/buffalo"
 	"github.com/gobuffalo/events"
 	"github.com/gobuffalo/nulls"
 	"github.com/gobuffalo/pop"
@@ -490,6 +491,19 @@ func (u *User) RemovePhoto() error {
 	return nil
 }
 
+// GetPhotoID retrieves the UUID of the User's photo file
+func (u *User) GetPhotoID() (*string, error) {
+	if err := DB.Load(u, "PhotoFile"); err != nil {
+		return nil, err
+	}
+	if u.PhotoFileID.Valid {
+		photoID := u.PhotoFile.UUID.String()
+		return &photoID, nil
+	}
+
+	return nil, nil
+}
+
 // GetPhotoURL retrieves the photo URL from the attached file
 func (u *User) GetPhotoURL() (*string, error) {
 	if err := DB.Load(u, "PhotoFile"); err != nil {
@@ -500,9 +514,7 @@ func (u *User) GetPhotoURL() (*string, error) {
 		if u.AuthPhotoURL.Valid {
 			return &u.AuthPhotoURL.String, nil
 		}
-		// ref: https://en.gravatar.com/site/implement/images/
-		hash := md5.Sum([]byte(strings.ToLower(strings.TrimSpace(u.Email))))
-		url := fmt.Sprintf("https://www.gravatar.com/avatar/%x.jpg?s=200&d=mp", hash)
+		url := gravatarURL(u.Email)
 		return &url, nil
 	}
 
@@ -745,4 +757,56 @@ func (u User) GetLanguagePreference() string {
 // GetRealName returns the real name, first and last, of the user
 func (u *User) GetRealName() string {
 	return strings.TrimSpace(u.FirstName + " " + u.LastName)
+}
+
+// HasOrganization returns true if the user has one or more organization connections
+func (u *User) HasOrganization() bool {
+	var c Count
+	err := DB.RawQuery("SELECT COUNT(*) FROM user_organizations WHERE user_id = ?", u.ID).First(&c)
+	if err != nil {
+		domain.ErrLogger.Printf("error counting user organizations, user = '%s', err = %s", u.UUID, err)
+		return false
+	}
+	if c.N == 0 {
+		return false
+	}
+	return true
+}
+
+func (u *User) isMeetingOrganizer(ctx buffalo.Context, meeting Meeting) bool {
+	organizers, err := meeting.Organizers(ctx)
+	if err != nil {
+		domain.Error(ctx, "isMeetingOrganizer() error reading list of meeting organizers, "+err.Error())
+	}
+	for _, o := range organizers {
+		if o.ID == u.ID {
+			return true
+		}
+	}
+	return false
+}
+
+func (u *User) isSuperAdmin() bool {
+	return u.AdminRole == UserAdminRoleSuperAdmin
+}
+
+// MeetingsAsParticipant returns all meetings in which the user is a participant
+func (u *User) MeetingsAsParticipant(ctx context.Context) ([]Meeting, error) {
+	m := Meetings{}
+	if err := DB.
+		Where("meeting_participants.user_id=?", u.ID).
+		Join("meeting_participants", "meeting_participants.meeting_id=meetings.id").
+		All(&m); err != nil {
+
+		return m, domain.ReportError(ctx, err, "User.MeetingsAsParticipant", map[string]interface{}{"user": u.UUID})
+	}
+	return m, nil
+}
+
+func (u *User) CanCreateMeetingInvite(ctx buffalo.Context, meeting Meeting) bool {
+	return u.ID == meeting.CreatedByID || u.isMeetingOrganizer(ctx, meeting) || u.isSuperAdmin()
+}
+
+func (u *User) CanRemoveMeetingInvite(ctx buffalo.Context, meeting Meeting) bool {
+	return u.ID == meeting.CreatedByID || u.isMeetingOrganizer(ctx, meeting) || u.isSuperAdmin()
 }

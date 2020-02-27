@@ -2,6 +2,7 @@ package models
 
 import (
 	"context"
+	"crypto/md5"
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
@@ -116,18 +117,6 @@ func GetCurrentUserFromGqlContext(ctx context.Context) User {
 	return GetCurrentUser(bc)
 }
 
-type EmptyContext struct {
-	buffalo.Context
-}
-
-func GetBuffaloContextFromGqlContext(c context.Context) buffalo.Context {
-	bc, ok := c.Value("BuffaloContext").(buffalo.Context)
-	if ok {
-		return bc
-	}
-	return EmptyContext{}
-}
-
 func GetCurrentUser(c buffalo.Context) User {
 	user := c.Value("current_user")
 
@@ -239,4 +228,11 @@ func IsDBConnected() bool {
 		return !domain.IsOtherThanNoRows(err)
 	}
 	return true
+}
+
+func gravatarURL(email string) string {
+	// ref: https://en.gravatar.com/site/implement/images/
+	hash := md5.Sum([]byte(strings.ToLower(strings.TrimSpace(email))))
+	url := fmt.Sprintf("https://www.gravatar.com/avatar/%x.jpg?s=200&d=mp", hash)
+	return url
 }

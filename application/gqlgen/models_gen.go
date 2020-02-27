@@ -11,6 +11,26 @@ import (
 	"github.com/silinternational/wecarry-api/models"
 )
 
+// Input object for `createMeetingInvites`
+type CreateMeetingInvitesInput struct {
+	// ID of the `Meeting`
+	MeetingID string `json:"meetingID"`
+	// Email addresses of the invitees. Duplicate values are ignored.
+	Emails []string `json:"emails"`
+	// NOT YET IMPLEMENTED -- Send email invites. Default is 'false', do not send any emails.
+	SendEmail *bool `json:"sendEmail"`
+}
+
+// Input object for `createMeetingParticipant`
+type CreateMeetingParticipantInput struct {
+	// ID of the `Meeting`
+	MeetingID string `json:"meetingID"`
+	// Confirmation code from the `MeetingInvite`. If not provided, the `Meeting` must not be `INVITE_ONLY`.
+	ConfirmationCode *string `json:"confirmationCode"`
+	// Add as a `Meeting` Organizer. Authenticated `User` must be authorized [definition TBD] to do this.
+	IsOrganizer *bool `json:"isOrganizer"`
+}
+
 type CreateMessageInput struct {
 	Content  string  `json:"content"`
 	PostID   string  `json:"postID"`
@@ -61,6 +81,22 @@ type PublicProfile struct {
 	AvatarURL *string `json:"avatarURL"`
 }
 
+// Input object for `removeMeetingInvite`
+type RemoveMeetingInviteInput struct {
+	// ID of the `Meeting`
+	MeetingID string `json:"meetingID"`
+	// Email addresse of the invitee to remove
+	Email string `json:"email"`
+}
+
+// Input object for `removeMeetingParticipant`
+type RemoveMeetingParticipantInput struct {
+	// ID of the `Meeting`
+	MeetingID string `json:"meetingID"`
+	// `User` ID of the `Meeting` participant to remove
+	UserID string `json:"userID"`
+}
+
 type RemoveOrganizationDomainInput struct {
 	Domain         string `json:"domain"`
 	OrganizationID string `json:"organizationID"`
@@ -95,7 +131,7 @@ type UpdatePostStatusInput struct {
 	ProviderUserID *string           `json:"providerUserID"`
 }
 
-// Update User profile information. If ID is not specified, the authenticated user is assumed.
+// Input object for `updateUser`
 type UpdateUserInput struct {
 	ID       *string `json:"id"`
 	Nickname *string `json:"nickname"`
@@ -110,6 +146,56 @@ type UpdateUserPreferencesInput struct {
 	Language   *PreferredLanguage   `json:"language"`
 	TimeZone   *string              `json:"timeZone"`
 	WeightUnit *PreferredWeightUnit `json:"weightUnit"`
+}
+
+// Visibility for Meetings (Events), determines who can see a `Meeting`.
+type MeetingVisibility string
+
+const (
+	// Visible to invitees and all app users
+	MeetingVisibilityAll MeetingVisibility = "ALL"
+	// Visible to invitees and members of the `Meeting` organization and affiliated organizations
+	MeetingVisibilityTrusted MeetingVisibility = "TRUSTED"
+	// Visible to invitees and members of the `Meeting` organization
+	MeetingVisibilityOrganization MeetingVisibility = "ORGANIZATION"
+	// Visible only to invitees
+	MeetingVisibilityInviteOnly MeetingVisibility = "INVITE_ONLY"
+)
+
+var AllMeetingVisibility = []MeetingVisibility{
+	MeetingVisibilityAll,
+	MeetingVisibilityTrusted,
+	MeetingVisibilityOrganization,
+	MeetingVisibilityInviteOnly,
+}
+
+func (e MeetingVisibility) IsValid() bool {
+	switch e {
+	case MeetingVisibilityAll, MeetingVisibilityTrusted, MeetingVisibilityOrganization, MeetingVisibilityInviteOnly:
+		return true
+	}
+	return false
+}
+
+func (e MeetingVisibility) String() string {
+	return string(e)
+}
+
+func (e *MeetingVisibility) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = MeetingVisibility(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid MeetingVisibility", str)
+	}
+	return nil
+}
+
+func (e MeetingVisibility) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 type PostRole string
