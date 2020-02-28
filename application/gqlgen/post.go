@@ -175,7 +175,7 @@ func (r *postResolver) Threads(ctx context.Context, obj *models.Post) ([]models.
 		return nil, nil
 	}
 
-	user := models.GetCurrentUserFromGqlContext(ctx)
+	user := models.CurrentUser(ctx)
 	threads, err := obj.GetThreads(user)
 	if err != nil {
 		extras := map[string]interface{}{
@@ -271,7 +271,7 @@ func (r *postResolver) IsEditable(ctx context.Context, obj *models.Post) (bool, 
 	if obj == nil {
 		return false, nil
 	}
-	cUser := models.GetCurrentUserFromGqlContext(ctx)
+	cUser := models.CurrentUser(ctx)
 	return obj.IsEditable(cUser)
 }
 
@@ -280,7 +280,7 @@ func (r *queryResolver) Posts(ctx context.Context, destination, origin *Location
 	[]models.Post, error) {
 
 	posts := models.Posts{}
-	cUser := models.GetCurrentUserFromGqlContext(ctx)
+	cUser := models.CurrentUser(ctx)
 
 	err := posts.FindByUser(ctx, cUser, convertOptionalLocation(destination), convertOptionalLocation(origin),
 		searchText)
@@ -300,7 +300,7 @@ func (r *queryResolver) Post(ctx context.Context, id *string) (*models.Post, err
 		return nil, nil
 	}
 	var post models.Post
-	cUser := models.GetCurrentUserFromGqlContext(ctx)
+	cUser := models.CurrentUser(ctx)
 	if err := post.FindByUserAndUUID(ctx, cUser, *id); err != nil {
 		extras := map[string]interface{}{
 			"user": cUser.UUID,
@@ -414,7 +414,7 @@ type potentialProvider struct {
 
 // CreatePost resolves the `createPost` mutation.
 func (r *mutationResolver) CreatePost(ctx context.Context, input postInput) (*models.Post, error) {
-	cUser := models.GetCurrentUserFromGqlContext(ctx)
+	cUser := models.CurrentUser(ctx)
 	extras := map[string]interface{}{
 		"user": cUser.UUID,
 	}
@@ -447,7 +447,7 @@ func (r *mutationResolver) CreatePost(ctx context.Context, input postInput) (*mo
 
 // UpdatePost resolves the `updatePost` mutation.
 func (r *mutationResolver) UpdatePost(ctx context.Context, input postInput) (*models.Post, error) {
-	cUser := models.GetCurrentUserFromGqlContext(ctx)
+	cUser := models.CurrentUser(ctx)
 	extras := map[string]interface{}{
 		"user": cUser.UUID,
 	}
@@ -496,7 +496,7 @@ func (r *mutationResolver) UpdatePostStatus(ctx context.Context, input UpdatePos
 		return nil, domain.ReportError(ctx, err, "UpdatePostStatus.FindPost")
 	}
 
-	cUser := models.GetCurrentUserFromGqlContext(ctx)
+	cUser := models.CurrentUser(ctx)
 	extras := map[string]interface{}{
 		"user":      cUser.UUID,
 		"oldStatus": post.Status,
@@ -568,7 +568,7 @@ func (r *mutationResolver) AddMeAsPotentialProvider(ctx context.Context, input P
 }
 
 func (r *mutationResolver) RemoveMeAsPotentialProvider(ctx context.Context, postID string) (*models.Post, error) {
-	cUser := models.GetCurrentUserFromGqlContext(ctx)
+	cUser := models.CurrentUser(ctx)
 
 	var provider models.PotentialProvider
 
@@ -605,7 +605,7 @@ func (r *mutationResolver) RemoveMeAsPotentialProvider(ctx context.Context, post
 }
 
 func (r *mutationResolver) RemovePotentialProvider(ctx context.Context, postID, userID string) (*models.Post, error) {
-	cUser := models.GetCurrentUserFromGqlContext(ctx)
+	cUser := models.CurrentUser(ctx)
 
 	var provider models.PotentialProvider
 

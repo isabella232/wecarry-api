@@ -365,6 +365,8 @@ type PostResolver interface {
 }
 type PotentialProviderResolver interface {
 	User(ctx context.Context, obj *potentialProvider) (*PublicProfile, error)
+	DeliveryAfter(ctx context.Context, obj *potentialProvider) (string, error)
+	DeliveryBefore(ctx context.Context, obj *potentialProvider) (string, error)
 }
 type QueryResolver interface {
 	Users(ctx context.Context) ([]models.User, error)
@@ -1797,10 +1799,7 @@ type Mutation {
     "Remove a ` + "`" + `MeetingInvite` + "`" + ` and return the remaining invites for the ` + "`" + `Meeting` + "`" + `"
     removeMeetingInvite(input: RemoveMeetingInviteInput!): [MeetingInvite!]!
 
-    """
-    NOT YET IMPLEMENTED --
-    Remove a ` + "`" + `MeetingParticipant` + "`" + ` and return the remaining participants for the ` + "`" + `Meeting` + "`" + `
-    """
+    "Remove a ` + "`" + `MeetingParticipant` + "`" + ` and return the remaining participants for the ` + "`" + `Meeting` + "`" + `"
     removeMeetingParticipant(input: RemoveMeetingParticipantInput!): [MeetingParticipant!]!
 }
 
@@ -6808,13 +6807,13 @@ func (ec *executionContext) _PotentialProvider_deliveryAfter(ctx context.Context
 		Object:   "PotentialProvider",
 		Field:    field,
 		Args:     nil,
-		IsMethod: false,
+		IsMethod: true,
 	}
 	ctx = graphql.WithResolverContext(ctx, rctx)
 	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.DeliveryAfter, nil
+		return ec.resolvers.PotentialProvider().DeliveryAfter(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -6845,13 +6844,13 @@ func (ec *executionContext) _PotentialProvider_deliveryBefore(ctx context.Contex
 		Object:   "PotentialProvider",
 		Field:    field,
 		Args:     nil,
-		IsMethod: false,
+		IsMethod: true,
 	}
 	ctx = graphql.WithResolverContext(ctx, rctx)
 	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.DeliveryBefore, nil
+		return ec.resolvers.PotentialProvider().DeliveryBefore(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -10173,18 +10172,12 @@ func (ec *executionContext) unmarshalInputLocationInput(ctx context.Context, obj
 	return it, nil
 }
 
-<<<<<<< HEAD
 func (ec *executionContext) unmarshalInputPotentialProviderInput(ctx context.Context, obj interface{}) (PotentialProviderInput, error) {
 	var it PotentialProviderInput
-=======
-func (ec *executionContext) unmarshalInputRemoveMeetingInviteInput(ctx context.Context, obj interface{}) (RemoveMeetingInviteInput, error) {
-	var it RemoveMeetingInviteInput
->>>>>>> develop
 	var asMap = obj.(map[string]interface{})
 
 	for k, v := range asMap {
 		switch k {
-<<<<<<< HEAD
 		case "postID":
 			var err error
 			it.PostID, err = ec.unmarshalNString2string(ctx, v)
@@ -10200,7 +10193,21 @@ func (ec *executionContext) unmarshalInputRemoveMeetingInviteInput(ctx context.C
 		case "deliveryBefore":
 			var err error
 			it.DeliveryBefore, err = ec.unmarshalNString2string(ctx, v)
-=======
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputRemoveMeetingInviteInput(ctx context.Context, obj interface{}) (RemoveMeetingInviteInput, error) {
+	var it RemoveMeetingInviteInput
+	var asMap = obj.(map[string]interface{})
+
+	for k, v := range asMap {
+		switch k {
 		case "meetingID":
 			var err error
 			it.MeetingID, err = ec.unmarshalNID2string(ctx, v)
@@ -10234,7 +10241,6 @@ func (ec *executionContext) unmarshalInputRemoveMeetingParticipantInput(ctx cont
 		case "userID":
 			var err error
 			it.UserID, err = ec.unmarshalNID2string(ctx, v)
->>>>>>> develop
 			if err != nil {
 				return it, err
 			}
@@ -11795,15 +11801,33 @@ func (ec *executionContext) _PotentialProvider(ctx context.Context, sel ast.Sele
 				return res
 			})
 		case "deliveryAfter":
-			out.Values[i] = ec._PotentialProvider_deliveryAfter(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._PotentialProvider_deliveryAfter(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			})
 		case "deliveryBefore":
-			out.Values[i] = ec._PotentialProvider_deliveryBefore(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._PotentialProvider_deliveryBefore(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
