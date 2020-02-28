@@ -63,8 +63,8 @@ func (m *meetingInviteResolver) Inviter(ctx context.Context, obj *models.Meeting
 	return getPublicProfile(ctx, &inviter), nil
 }
 
-func (r *Resolver) MeetingParticipant() MeetingParticipantResolver {
-	return &meetingParticipantResolver{r}
+func (r *Resolver) MeetingParticipant() meetingParticipantResolver {
+	return meetingParticipantResolver{r}
 }
 
 type meetingParticipantResolver struct{ *Resolver }

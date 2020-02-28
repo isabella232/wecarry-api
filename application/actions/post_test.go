@@ -27,9 +27,16 @@ type PostResponse struct {
 	Post Post `json:"post"`
 }
 
+type PublicProfile struct {
+	ID        string `json:"id"`
+	Nickname  string `json:"nickname"`
+	AvatarURL string `json:"avatarURL"`
+}
+
 type PotentialProvider struct {
-	ID       string `json:"id"`
-	Nickname string `json:"nickname"`
+	User           PublicProfile `json:"user"`
+	DeliveryAfter  string        `json:"deliveryAfter"`
+	DeliveryBefore string        `json:"deliveryBefore"`
 }
 
 type Post struct {
@@ -96,7 +103,7 @@ const allPostFields = `{
 			createdBy { id nickname avatarURL }
 			receiver { id nickname avatarURL }
 			provider { id nickname avatarURL }
-            potentialProviders { id nickname avatarURL }
+            potentialProviders { user { id nickname avatarURL }}
 			organization { id }
 			title
 			description
@@ -500,7 +507,7 @@ func (as *ActionSuite) Test_UpdatePostStatus_DestroyPotentialProviders() {
 
 	for _, step := range steps {
 		input := `id: "` + f.Posts[0].UUID.String() + `", status: ` + step.status.String()
-		query := `mutation { post: updatePostStatus(input: {` + input + `}) {id status potentialProviders {id}}}`
+		query := `mutation { post: updatePostStatus(input: {` + input + `}) {id status potentialProviders {user {nickname}}}}`
 
 		err := as.testGqlQuery(query, step.user.Nickname, &postsResp)
 		if step.wantErr {

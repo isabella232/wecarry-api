@@ -148,6 +148,15 @@ type UpdateUserPreferencesInput struct {
 	WeightUnit *PreferredWeightUnit `json:"weightUnit"`
 }
 
+// The User who has offered to fufill the request and the delivery date range
+type PotentialProvider struct {
+	User *PublicProfile `json:"user"`
+	// Date (yyyy-mm-dd). DeliveryAfter is NOT intended to be inclusive of the day itself.
+	DeliveryAfter string `json:"deliveryAfter"`
+	// Date (yyyy-mm-dd). It is intended to be inclusive of the day itself (i.e. 'on or before')
+	DeliveryBefore string `json:"deliveryBefore"`
+}
+
 // Visibility for Meetings (Events), determines who can see a `Meeting`.
 type MeetingVisibility string
 

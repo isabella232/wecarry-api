@@ -67,6 +67,8 @@ models:
         resolver: true
       meeting:
         resolver: true
+      potentialProviders:
+        resolver: true
   Meeting:
     model: models.Meeting
     fields:
@@ -115,8 +117,6 @@ models:
     model: gqlgen.postInput
   CreatePostInput:
     model: gqlgen.postInput
-  PotentialProvider:
-    model: gqlgen.potentialProvider
   Location:
     model: models.Location
   PostType:
@@ -144,13 +144,4 @@ models:
     model: models.MeetingInvite
     fields:
       avatarURL:
-        resolver: true
-  MeetingParticipant:
-    model: models.MeetingParticipant
-    fields:
-      meeting:
-        resolver: true
-      user:
-        resolver: true
-      invite:
         resolver: true

@@ -71,7 +71,7 @@ func (r *postResolver) Provider(ctx context.Context, obj *models.Post) (*PublicP
 
 // PotentialProviders resolves the `potentialProviders` property of the post query,
 // retrieving the related records from the database.
-func (r *postResolver) PotentialProviders(ctx context.Context, obj *models.Post) ([]potentialProvider, error) {
+func (r *postResolver) PotentialProviders(ctx context.Context, obj *models.Post) ([]PotentialProvider, error) {
 	if obj == nil {
 		return nil, nil
 	}
@@ -81,7 +81,7 @@ func (r *postResolver) PotentialProviders(ctx context.Context, obj *models.Post)
 		return nil, domain.ReportError(ctx, err, "GetPotentialProviders")
 	}
 
-	var gqlProviders []potentialProvider
+	var gqlProviders []PotentialProvider
 
 	for _, p := range dbProviders {
 		publicProfile := getPublicProfile(ctx, &p.User)
@@ -89,10 +89,10 @@ func (r *postResolver) PotentialProviders(ctx context.Context, obj *models.Post)
 			continue
 		}
 
-		newPotential := potentialProvider{
-			user:           *publicProfile,
-			deliveryAfter:  p.DeliveryAfter.Format(domain.DateFormat),
-			deliveryBefore: p.DeliveryBefore.Format(domain.DateFormat),
+		newPotential := PotentialProvider{
+			User:           publicProfile,
+			DeliveryAfter:  p.DeliveryAfter.Format(domain.DateFormat),
+			DeliveryBefore: p.DeliveryBefore.Format(domain.DateFormat),
 		}
 		gqlProviders = append(gqlProviders, newPotential)
 	}
@@ -406,12 +406,6 @@ type postInput struct {
 	Visibility   *models.PostVisibility
 }
 
-type potentialProvider struct {
-	user           PublicProfile
-	deliveryAfter  string
-	deliveryBefore string
-}
-
 // CreatePost resolves the `createPost` mutation.
 func (r *mutationResolver) CreatePost(ctx context.Context, input postInput) (*models.Post, error) {
 	cUser := models.CurrentUser(ctx)
@@ -526,7 +520,7 @@ func (r *mutationResolver) UpdatePostStatus(ctx context.Context, input UpdatePos
 }
 
 func (r *mutationResolver) AddMeAsPotentialProvider(ctx context.Context, input PotentialProviderInput) (*models.Post, error) {
-	cUser := models.GetCurrentUserFromGqlContext(ctx)
+	cUser := models.CurrentUser(ctx)
 
 	var post models.Post
 	if err := post.FindByUUIDForCurrentUser(input.PostID, cUser); err != nil {
@@ -639,4 +633,39 @@ func (r *mutationResolver) RemovePotentialProvider(ctx context.Context, postID, 
 	}
 
 	return &post, nil
+}
+
+// PotentialProvider returns the potentialProvider resolver. It is required by GraphQL
+func (r *Resolver) PotentialProvider() potentialProviderResolver {
+	return potentialProviderResolver{r}
+}
+
+type potentialProviderResolver struct{ *Resolver }
+
+func (r *potentialProviderResolver) User(ctx context.Context, obj *models.PotentialProvider) (*PublicProfile, error) {
+	if obj == nil {
+		return nil, nil
+	}
+
+	var user models.User
+	if err := user.FindByID(obj.UserID); err != nil {
+		return nil, domain.ReportError(ctx, err, "PotentialProvider.FindUser")
+	}
+
+	return getPublicProfile(ctx, &user), nil
+}
+
+func (r *potentialProviderResolver) DeliveryAfter(ctx context.Context, obj *models.PotentialProvider) (string, error) {
+	if obj == nil {
+		return "", nil
+	}
+	return obj.DeliveryAfter.Format(domain.DateFormat), nil
+}
+
+func (r *potentialProviderResolver) DeliveryBefore(ctx context.Context, obj *models.PotentialProvider) (string, error) {
+	if obj == nil {
+		return "", nil
+	}
+
+	return obj.DeliveryBefore.Format(domain.DateFormat), nil
 }

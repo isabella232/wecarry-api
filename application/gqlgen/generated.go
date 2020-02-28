@@ -40,13 +40,11 @@ type ResolverRoot interface {
 	Location() LocationResolver
 	Meeting() MeetingResolver
 	MeetingInvite() MeetingInviteResolver
-	MeetingParticipant() MeetingParticipantResolver
 	Message() MessageResolver
 	Mutation() MutationResolver
 	Organization() OrganizationResolver
 	OrganizationDomain() OrganizationDomainResolver
 	Post() PostResolver
-	PotentialProvider() PotentialProviderResolver
 	Query() QueryResolver
 	Thread() ThreadResolver
 	User() UserResolver
@@ -189,12 +187,6 @@ type ComplexityRoot struct {
 		Visibility         func(childComplexity int) int
 	}
 
-	PotentialProvider struct {
-		DeliveryAfter  func(childComplexity int) int
-		DeliveryBefore func(childComplexity int) int
-		User           func(childComplexity int) int
-	}
-
 	PublicProfile struct {
 		AvatarURL func(childComplexity int) int
 		ID        func(childComplexity int) int
@@ -257,6 +249,12 @@ type ComplexityRoot struct {
 		Location func(childComplexity int) int
 		Owner    func(childComplexity int) int
 	}
+
+	PotentialProvider struct {
+		DeliveryAfter  func(childComplexity int) int
+		DeliveryBefore func(childComplexity int) int
+		User           func(childComplexity int) int
+	}
 }
 
 type FileResolver interface {
@@ -287,12 +285,6 @@ type MeetingInviteResolver interface {
 	Inviter(ctx context.Context, obj *models.MeetingInvite) (*PublicProfile, error)
 
 	AvatarURL(ctx context.Context, obj *models.MeetingInvite) (string, error)
-}
-type MeetingParticipantResolver interface {
-	Meeting(ctx context.Context, obj *models.MeetingParticipant) (*models.Meeting, error)
-	User(ctx context.Context, obj *models.MeetingParticipant) (*models.User, error)
-
-	Invite(ctx context.Context, obj *models.MeetingParticipant) (*models.MeetingInvite, error)
 }
 type MessageResolver interface {
 	ID(ctx context.Context, obj *models.Message) (string, error)
@@ -344,7 +336,7 @@ type PostResolver interface {
 	CreatedBy(ctx context.Context, obj *models.Post) (*PublicProfile, error)
 	Receiver(ctx context.Context, obj *models.Post) (*PublicProfile, error)
 	Provider(ctx context.Context, obj *models.Post) (*PublicProfile, error)
-	PotentialProviders(ctx context.Context, obj *models.Post) ([]potentialProvider, error)
+	PotentialProviders(ctx context.Context, obj *models.Post) ([]PotentialProvider, error)
 	Organization(ctx context.Context, obj *models.Post) (*models.Organization, error)
 
 	Description(ctx context.Context, obj *models.Post) (*string, error)
@@ -362,11 +354,6 @@ type PostResolver interface {
 	Files(ctx context.Context, obj *models.Post) ([]models.File, error)
 	Meeting(ctx context.Context, obj *models.Post) (*models.Meeting, error)
 	IsEditable(ctx context.Context, obj *models.Post) (bool, error)
-}
-type PotentialProviderResolver interface {
-	User(ctx context.Context, obj *potentialProvider) (*PublicProfile, error)
-	DeliveryAfter(ctx context.Context, obj *potentialProvider) (string, error)
-	DeliveryBefore(ctx context.Context, obj *potentialProvider) (string, error)
 }
 type QueryResolver interface {
 	Users(ctx context.Context) ([]models.User, error)
@@ -1259,27 +1246,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Post.Visibility(childComplexity), true
 
-	case "PotentialProvider.deliveryAfter":
-		if e.complexity.PotentialProvider.DeliveryAfter == nil {
-			break
-		}
-
-		return e.complexity.PotentialProvider.DeliveryAfter(childComplexity), true
-
-	case "PotentialProvider.deliveryBefore":
-		if e.complexity.PotentialProvider.DeliveryBefore == nil {
-			break
-		}
-
-		return e.complexity.PotentialProvider.DeliveryBefore(childComplexity), true
-
-	case "PotentialProvider.user":
-		if e.complexity.PotentialProvider.User == nil {
-			break
-		}
-
-		return e.complexity.PotentialProvider.User(childComplexity), true
-
 	case "PublicProfile.avatarURL":
 		if e.complexity.PublicProfile.AvatarURL == nil {
 			break
@@ -1635,6 +1601,27 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Watch.Owner(childComplexity), true
 
+	case "potentialProvider.deliveryAfter":
+		if e.complexity.PotentialProvider.DeliveryAfter == nil {
+			break
+		}
+
+		return e.complexity.PotentialProvider.DeliveryAfter(childComplexity), true
+
+	case "potentialProvider.deliveryBefore":
+		if e.complexity.PotentialProvider.DeliveryBefore == nil {
+			break
+		}
+
+		return e.complexity.PotentialProvider.DeliveryBefore(childComplexity), true
+
+	case "potentialProvider.user":
+		if e.complexity.PotentialProvider.User == nil {
+			break
+		}
+
+		return e.complexity.PotentialProvider.User(childComplexity), true
+
 	}
 	return 0, false
 }
@@ -1942,7 +1929,8 @@ type Post {
     receiver: PublicProfile
     "Profile of the user that is the provider for this post. For offers, this is the same as ` + "`" + `createdBy` + "`" + `."
     provider: PublicProfile
-    potentialProviders: [PotentialProvider!]
+    "Profiles of users who have offered to fufill the request along with the delivery date range"
+    potentialProviders: [potentialProvider!]
     "Organization associated with this post."
     organization: Organization
     "Short description of item"
@@ -1986,7 +1974,7 @@ type Post {
 }
 
 "The User who has offered to fufill the request and the delivery date range"
-type PotentialProvider {
+type potentialProvider {
     user: PublicProfile!
     "Date (yyyy-mm-dd). DeliveryAfter is NOT intended to be inclusive of the day itself."
     deliveryAfter: String!
@@ -3995,7 +3983,7 @@ func (ec *executionContext) _MeetingParticipant_meeting(ctx context.Context, fie
 	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.MeetingParticipant().Meeting(rctx, obj)
+		return obj.Meeting()
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -4007,10 +3995,10 @@ func (ec *executionContext) _MeetingParticipant_meeting(ctx context.Context, fie
 		}
 		return graphql.Null
 	}
-	res := resTmp.(*models.Meeting)
+	res := resTmp.(models.Meeting)
 	rctx.Result = res
 	ctx = ec.Tracer.StartFieldChildExecution(ctx)
-	return ec.marshalNMeeting2ᚖgithubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋmodelsᚐMeeting(ctx, field.Selections, res)
+	return ec.marshalNMeeting2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋmodelsᚐMeeting(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _MeetingParticipant_user(ctx context.Context, field graphql.CollectedField, obj *models.MeetingParticipant) (ret graphql.Marshaler) {
@@ -4032,7 +4020,7 @@ func (ec *executionContext) _MeetingParticipant_user(ctx context.Context, field 
 	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.MeetingParticipant().User(rctx, obj)
+		return obj.User()
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -4044,10 +4032,10 @@ func (ec *executionContext) _MeetingParticipant_user(ctx context.Context, field 
 		}
 		return graphql.Null
 	}
-	res := resTmp.(*models.User)
+	res := resTmp.(models.User)
 	rctx.Result = res
 	ctx = ec.Tracer.StartFieldChildExecution(ctx)
-	return ec.marshalNUser2ᚖgithubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋmodelsᚐUser(ctx, field.Selections, res)
+	return ec.marshalNUser2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋmodelsᚐUser(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _MeetingParticipant_isOrganizer(ctx context.Context, field graphql.CollectedField, obj *models.MeetingParticipant) (ret graphql.Marshaler) {
@@ -4103,7 +4091,7 @@ func (ec *executionContext) _MeetingParticipant_invite(ctx context.Context, fiel
 	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.MeetingParticipant().Invite(rctx, obj)
+		return obj.Invite()
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -6041,10 +6029,10 @@ func (ec *executionContext) _Post_potentialProviders(ctx context.Context, field 
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.([]potentialProvider)
+	res := resTmp.([]PotentialProvider)
 	rctx.Result = res
 	ctx = ec.Tracer.StartFieldChildExecution(ctx)
-	return ec.marshalOPotentialProvider2ᚕgithubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐpotentialProvider(ctx, field.Selections, res)
+	return ec.marshalOpotentialProvider2ᚕgithubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐPotentialProvider(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Post_organization(ctx context.Context, field graphql.CollectedField, obj *models.Post) (ret graphql.Marshaler) {
@@ -6755,117 +6743,6 @@ func (ec *executionContext) _Post_visibility(ctx context.Context, field graphql.
 	rctx.Result = res
 	ctx = ec.Tracer.StartFieldChildExecution(ctx)
 	return ec.marshalNPostVisibility2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋmodelsᚐPostVisibility(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _PotentialProvider_user(ctx context.Context, field graphql.CollectedField, obj *potentialProvider) (ret graphql.Marshaler) {
-	ctx = ec.Tracer.StartFieldExecution(ctx, field)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-		ec.Tracer.EndFieldExecution(ctx)
-	}()
-	rctx := &graphql.ResolverContext{
-		Object:   "PotentialProvider",
-		Field:    field,
-		Args:     nil,
-		IsMethod: true,
-	}
-	ctx = graphql.WithResolverContext(ctx, rctx)
-	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.PotentialProvider().User(rctx, obj)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !ec.HasError(rctx) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(*PublicProfile)
-	rctx.Result = res
-	ctx = ec.Tracer.StartFieldChildExecution(ctx)
-	return ec.marshalNPublicProfile2ᚖgithubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐPublicProfile(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _PotentialProvider_deliveryAfter(ctx context.Context, field graphql.CollectedField, obj *potentialProvider) (ret graphql.Marshaler) {
-	ctx = ec.Tracer.StartFieldExecution(ctx, field)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-		ec.Tracer.EndFieldExecution(ctx)
-	}()
-	rctx := &graphql.ResolverContext{
-		Object:   "PotentialProvider",
-		Field:    field,
-		Args:     nil,
-		IsMethod: true,
-	}
-	ctx = graphql.WithResolverContext(ctx, rctx)
-	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.PotentialProvider().DeliveryAfter(rctx, obj)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !ec.HasError(rctx) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(string)
-	rctx.Result = res
-	ctx = ec.Tracer.StartFieldChildExecution(ctx)
-	return ec.marshalNString2string(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _PotentialProvider_deliveryBefore(ctx context.Context, field graphql.CollectedField, obj *potentialProvider) (ret graphql.Marshaler) {
-	ctx = ec.Tracer.StartFieldExecution(ctx, field)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-		ec.Tracer.EndFieldExecution(ctx)
-	}()
-	rctx := &graphql.ResolverContext{
-		Object:   "PotentialProvider",
-		Field:    field,
-		Args:     nil,
-		IsMethod: true,
-	}
-	ctx = graphql.WithResolverContext(ctx, rctx)
-	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.PotentialProvider().DeliveryBefore(rctx, obj)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !ec.HasError(rctx) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(string)
-	rctx.Result = res
-	ctx = ec.Tracer.StartFieldChildExecution(ctx)
-	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _PublicProfile_id(ctx context.Context, field graphql.CollectedField, obj *PublicProfile) (ret graphql.Marshaler) {
@@ -9772,6 +9649,117 @@ func (ec *executionContext) ___Type_ofType(ctx context.Context, field graphql.Co
 	return ec.marshalO__Type2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐType(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _potentialProvider_user(ctx context.Context, field graphql.CollectedField, obj *PotentialProvider) (ret graphql.Marshaler) {
+	ctx = ec.Tracer.StartFieldExecution(ctx, field)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+		ec.Tracer.EndFieldExecution(ctx)
+	}()
+	rctx := &graphql.ResolverContext{
+		Object:   "potentialProvider",
+		Field:    field,
+		Args:     nil,
+		IsMethod: false,
+	}
+	ctx = graphql.WithResolverContext(ctx, rctx)
+	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.User, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !ec.HasError(rctx) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*PublicProfile)
+	rctx.Result = res
+	ctx = ec.Tracer.StartFieldChildExecution(ctx)
+	return ec.marshalNPublicProfile2ᚖgithubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐPublicProfile(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _potentialProvider_deliveryAfter(ctx context.Context, field graphql.CollectedField, obj *PotentialProvider) (ret graphql.Marshaler) {
+	ctx = ec.Tracer.StartFieldExecution(ctx, field)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+		ec.Tracer.EndFieldExecution(ctx)
+	}()
+	rctx := &graphql.ResolverContext{
+		Object:   "potentialProvider",
+		Field:    field,
+		Args:     nil,
+		IsMethod: false,
+	}
+	ctx = graphql.WithResolverContext(ctx, rctx)
+	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.DeliveryAfter, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !ec.HasError(rctx) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	rctx.Result = res
+	ctx = ec.Tracer.StartFieldChildExecution(ctx)
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _potentialProvider_deliveryBefore(ctx context.Context, field graphql.CollectedField, obj *PotentialProvider) (ret graphql.Marshaler) {
+	ctx = ec.Tracer.StartFieldExecution(ctx, field)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+		ec.Tracer.EndFieldExecution(ctx)
+	}()
+	rctx := &graphql.ResolverContext{
+		Object:   "potentialProvider",
+		Field:    field,
+		Args:     nil,
+		IsMethod: false,
+	}
+	ctx = graphql.WithResolverContext(ctx, rctx)
+	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.DeliveryBefore, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !ec.HasError(rctx) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	rctx.Result = res
+	ctx = ec.Tracer.StartFieldChildExecution(ctx)
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
 // endregion **************************** field.gotpl *****************************
 
 // region    **************************** input.gotpl *****************************
@@ -11063,46 +11051,19 @@ func (ec *executionContext) _MeetingParticipant(ctx context.Context, sel ast.Sel
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("MeetingParticipant")
 		case "meeting":
-			field := field
-			out.Concurrently(i, func() (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._MeetingParticipant_meeting(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
-				}
-				return res
-			})
+			out.Values[i] = ec._MeetingParticipant_meeting(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		case "user":
-			field := field
-			out.Concurrently(i, func() (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._MeetingParticipant_user(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
-				}
-				return res
-			})
+			out.Values[i] = ec._MeetingParticipant_user(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		case "isOrganizer":
 			out.Values[i] = ec._MeetingParticipant_isOrganizer(ctx, field, obj)
 		case "invite":
-			field := field
-			out.Concurrently(i, func() (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._MeetingParticipant_invite(ctx, field, obj)
-				return res
-			})
+			out.Values[i] = ec._MeetingParticipant_invite(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -11764,70 +11725,6 @@ func (ec *executionContext) _Post(ctx context.Context, sel ast.SelectionSet, obj
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&invalids, 1)
 			}
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
-var potentialProviderImplementors = []string{"PotentialProvider"}
-
-func (ec *executionContext) _PotentialProvider(ctx context.Context, sel ast.SelectionSet, obj *potentialProvider) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.RequestContext, sel, potentialProviderImplementors)
-
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("PotentialProvider")
-		case "user":
-			field := field
-			out.Concurrently(i, func() (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._PotentialProvider_user(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
-				}
-				return res
-			})
-		case "deliveryAfter":
-			field := field
-			out.Concurrently(i, func() (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._PotentialProvider_deliveryAfter(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
-				}
-				return res
-			})
-		case "deliveryBefore":
-			field := field
-			out.Concurrently(i, func() (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._PotentialProvider_deliveryBefore(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
-				}
-				return res
-			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -12694,6 +12591,43 @@ func (ec *executionContext) ___Type(ctx context.Context, sel ast.SelectionSet, o
 	return out
 }
 
+var potentialProviderImplementors = []string{"potentialProvider"}
+
+func (ec *executionContext) _potentialProvider(ctx context.Context, sel ast.SelectionSet, obj *PotentialProvider) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.RequestContext, sel, potentialProviderImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("potentialProvider")
+		case "user":
+			out.Values[i] = ec._potentialProvider_user(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "deliveryAfter":
+			out.Values[i] = ec._potentialProvider_deliveryAfter(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "deliveryBefore":
+			out.Values[i] = ec._potentialProvider_deliveryBefore(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 // endregion **************************** object.gotpl ****************************
 
 // region    ***************************** type.gotpl *****************************
@@ -13312,10 +13246,6 @@ func (ec *executionContext) marshalNPostVisibility2githubᚗcomᚋsilinternation
 	return v
 }
 
-func (ec *executionContext) marshalNPotentialProvider2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐpotentialProvider(ctx context.Context, sel ast.SelectionSet, v potentialProvider) graphql.Marshaler {
-	return ec._PotentialProvider(ctx, sel, &v)
-}
-
 func (ec *executionContext) unmarshalNPotentialProviderInput2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐPotentialProviderInput(ctx context.Context, v interface{}) (PotentialProviderInput, error) {
 	return ec.unmarshalInputPotentialProviderInput(ctx, v)
 }
@@ -13891,6 +13821,10 @@ func (ec *executionContext) marshalN__TypeKind2string(ctx context.Context, sel a
 	return res
 }
 
+func (ec *executionContext) marshalNpotentialProvider2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐPotentialProvider(ctx context.Context, sel ast.SelectionSet, v PotentialProvider) graphql.Marshaler {
+	return ec._potentialProvider(ctx, sel, &v)
+}
+
 func (ec *executionContext) unmarshalOBoolean2bool(ctx context.Context, v interface{}) (bool, error) {
 	return graphql.UnmarshalBoolean(v)
 }
@@ -14107,46 +14041,6 @@ func (ec *executionContext) marshalOPostVisibility2ᚖgithubᚗcomᚋsilinternat
 		return graphql.Null
 	}
 	return v
-}
-
-func (ec *executionContext) marshalOPotentialProvider2ᚕgithubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐpotentialProvider(ctx context.Context, sel ast.SelectionSet, v []potentialProvider) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		rctx := &graphql.ResolverContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithResolverContext(ctx, rctx)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalNPotentialProvider2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐpotentialProvider(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
-	return ret
 }
 
 func (ec *executionContext) unmarshalOPreferredLanguage2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐPreferredLanguage(ctx context.Context, v interface{}) (PreferredLanguage, error) {
@@ -14454,6 +14348,46 @@ func (ec *executionContext) marshalO__Type2ᚖgithubᚗcomᚋ99designsᚋgqlgen�
 		return graphql.Null
 	}
 	return ec.___Type(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOpotentialProvider2ᚕgithubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐPotentialProvider(ctx context.Context, sel ast.SelectionSet, v []PotentialProvider) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		rctx := &graphql.ResolverContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithResolverContext(ctx, rctx)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNpotentialProvider2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐPotentialProvider(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+	return ret
 }
 
 // endregion ***************************** type.gotpl *****************************
