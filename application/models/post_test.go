@@ -1699,7 +1699,7 @@ func (ms *ModelSuite) TestPosts_GetPotentialProviders() {
 		post      Post
 		wantPPIDs []int
 	}{
-		{name: "pps for first post", post: posts[0], wantPPIDs: []int{pps[0].UserID, pps[1].UserID, pps[2].UserID}},
+		{name: "pps for first post", post: posts[0], wantPPIDs: []int{pps[0].ID, pps[1].ID, pps[2].ID}},
 		{name: "no pps for third post", post: posts[2], wantPPIDs: []int{}},
 	}
 	for _, test := range tests {

@@ -2,7 +2,9 @@ package actions
 
 import (
 	"fmt"
+	"time"
 
+	"github.com/silinternational/wecarry-api/domain"
 	"github.com/silinternational/wecarry-api/internal/test"
 )
 
@@ -10,12 +12,15 @@ func (as *ActionSuite) Test_AddMeAsPotentialProvider() {
 
 	f := test.CreatePotentialProvidersFixtures(as.DB)
 	posts := f.Posts
+	const qTemplate = `mutation {post: addMeAsPotentialProvider ` +
+		`(input: {postID: "%s" deliveryAfter: "%s" deliveryBefore: "%s"})` +
+		` {id title potentialProviders{user{id nickname} deliveryAfter deliveryBefore}}}`
 
-	const qTemplate = `mutation {post: addMeAsPotentialProvider (postID: "%s")` +
-		` {id title potentialProviders{user{id nickname}}}}`
+	deliveryAfter := time.Now().Add(domain.DurationWeek).Format(domain.DateFormat)
+	deliveryBefore := time.Now().Add(2 * domain.DurationWeek).Format(domain.DateFormat)
 
 	// Add one to Post with none
-	query := fmt.Sprintf(qTemplate, posts[2].UUID.String())
+	query := fmt.Sprintf(qTemplate, posts[2].UUID.String(), deliveryAfter, deliveryBefore)
 
 	var resp PostResponse
 
@@ -25,34 +30,48 @@ func (as *ActionSuite) Test_AddMeAsPotentialProvider() {
 	as.Equal(posts[2].Title, resp.Post.Title, "incorrect Post title")
 
 	want := []PotentialProvider{
-		{User: PublicProfile{ID: f.Users[1].UUID.String(), Nickname: f.Users[1].Nickname}}}
+		{User: PublicProfile{ID: f.Users[1].UUID.String(), Nickname: f.Users[1].Nickname},
+			DeliveryAfter: deliveryAfter, DeliveryBefore: deliveryBefore}}
 	as.Equal(want, resp.Post.PotentialProviders, "incorrect potential providers")
 
 	// Add one to Post with two already
-	query = fmt.Sprintf(qTemplate, posts[1].UUID.String())
+	deliveryBefore = time.Now().Add(3 * domain.DurationWeek).Format(domain.DateFormat)
+	query = fmt.Sprintf(qTemplate, posts[1].UUID.String(), deliveryAfter, deliveryBefore)
 
 	err = as.testGqlQuery(query, f.Users[1].Nickname, &resp)
 	as.NoError(err)
 	as.Equal(posts[1].UUID.String(), resp.Post.ID, "incorrect Post UUID")
 	as.Equal(posts[1].Title, resp.Post.Title, "incorrect Post title")
 
+	ppros := f.PotentialProviders
+	deliveryAfter0 := ppros[0].DeliveryAfter.Format(domain.DateFormat)
+	deliveryBefore0 := ppros[0].DeliveryBefore.Format(domain.DateFormat)
+	deliveryAfter1 := ppros[1].DeliveryAfter.Format(domain.DateFormat)
+	deliveryBefore1 := ppros[1].DeliveryBefore.Format(domain.DateFormat)
+
 	want = []PotentialProvider{
-		{User: PublicProfile{ID: f.Users[2].UUID.String(), Nickname: f.Users[2].Nickname}},
-		{User: PublicProfile{ID: f.Users[3].UUID.String(), Nickname: f.Users[3].Nickname}},
-		{User: PublicProfile{ID: f.Users[1].UUID.String(), Nickname: f.Users[1].Nickname}},
+		{User: PublicProfile{ID: f.Users[2].UUID.String(), Nickname: f.Users[2].Nickname},
+			DeliveryAfter: deliveryAfter0, DeliveryBefore: deliveryBefore0},
+		{User: PublicProfile{ID: f.Users[3].UUID.String(), Nickname: f.Users[3].Nickname},
+			DeliveryAfter: deliveryAfter1, DeliveryBefore: deliveryBefore1},
+		{User: PublicProfile{ID: f.Users[1].UUID.String(), Nickname: f.Users[1].Nickname},
+			DeliveryAfter: deliveryAfter, DeliveryBefore: deliveryBefore},
 	}
 	as.Equal(want, resp.Post.PotentialProviders, "incorrect potential providers")
 
 	// Adding a repeat gives an error
-	query = fmt.Sprintf(qTemplate, posts[1].UUID.String())
+	query = fmt.Sprintf(qTemplate, posts[1].UUID.String(), deliveryAfter, deliveryBefore)
 
 	err = as.testGqlQuery(query, f.Users[1].Nickname, &resp)
 	as.Error(err, "expected an error (unique together) but didn't get one")
 
 	want = []PotentialProvider{
-		{User: PublicProfile{ID: f.Users[2].UUID.String(), Nickname: f.Users[2].Nickname}},
-		{User: PublicProfile{ID: f.Users[3].UUID.String(), Nickname: f.Users[3].Nickname}},
-		{User: PublicProfile{ID: f.Users[1].UUID.String(), Nickname: f.Users[1].Nickname}},
+		{User: PublicProfile{ID: f.Users[2].UUID.String(), Nickname: f.Users[2].Nickname},
+			DeliveryAfter: deliveryAfter0, DeliveryBefore: deliveryBefore0},
+		{User: PublicProfile{ID: f.Users[3].UUID.String(), Nickname: f.Users[3].Nickname},
+			DeliveryAfter: deliveryAfter1, DeliveryBefore: deliveryBefore1},
+		{User: PublicProfile{ID: f.Users[1].UUID.String(), Nickname: f.Users[1].Nickname},
+			DeliveryAfter: deliveryAfter, DeliveryBefore: deliveryBefore},
 	}
 	as.Equal(want, resp.Post.PotentialProviders, "incorrect potential providers")
 

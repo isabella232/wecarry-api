@@ -228,8 +228,12 @@ func CreatePotentialProvidersFixtures(tx *pop.Connection) PotentialProvidersFixt
 	providers := models.PotentialProviders{}
 
 	for i, p := range posts[:2] {
-		for _, u := range uf.Users[i+1 : 4] {
-			c := models.PotentialProvider{PostID: p.ID, UserID: u.ID}
+		for ui, u := range uf.Users[i+1 : 4] {
+			uiDuration := time.Duration(ui + 2)
+			delAfter := time.Now().Add(2 * uiDuration * domain.DurationWeek)
+			delBefore := time.Now().Add(3 * uiDuration * domain.DurationWeek)
+			c := models.PotentialProvider{
+				PostID: p.ID, UserID: u.ID, DeliveryAfter: delAfter, DeliveryBefore: delBefore}
 			c.Create()
 			providers = append(providers, c)
 		}

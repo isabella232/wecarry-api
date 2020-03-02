@@ -546,7 +546,7 @@ func (r *mutationResolver) AddMeAsPotentialProvider(ctx context.Context, input P
 	}
 	provider.DeliveryAfter = deliveryAfter
 
-	deliveryBefore, err := time.Parse(domain.DateFormat, input.DeliveryAfter)
+	deliveryBefore, err := time.Parse(domain.DateFormat, input.DeliveryBefore)
 	if err != nil {
 		return nil, domain.ReportError(ctx, errors.New("error preparing potential provider's deliveryBefore date: "+err.Error()),
 			"AddMeAsPotentialProvider.DeliveryBefore")

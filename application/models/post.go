@@ -327,8 +327,7 @@ func (p *Post) SetProviderWithStatus(status PostStatus, providerID *string) erro
 	return nil
 }
 
-// GetPotentialProviders returns the User objects associated with the Post's
-// PotentialProviders
+// GetPotentialProviders returns the PotentialProvider objects associated with the Post
 func (p *Post) GetPotentialProviders() (PotentialProviders, error) {
 	if p.Type != PostTypeRequest {
 		return PotentialProviders{}, nil
