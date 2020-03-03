@@ -346,7 +346,7 @@ func (ms *ModelSuite) TestMeeting_FindByInviteCode() {
 	}
 }
 
-func (ms *ModelSuite) TestMeeting_AttachImage() {
+func (ms *ModelSuite) TestMeeting_SetImageFile() {
 	meetings := createMeetingFixtures(ms.DB, 3).Meetings
 	files := createFileFixtures(3)
 	meetings[1].ImageFileID = nulls.NewInt(files[0].ID)
@@ -382,7 +382,7 @@ func (ms *ModelSuite) TestMeeting_AttachImage() {
 	}
 	for _, tt := range tests {
 		ms.T().Run(tt.name, func(t *testing.T) {
-			got, err := tt.meeting.AttachImage(tt.newImage)
+			got, err := tt.meeting.SetImageFile(tt.newImage)
 			if tt.wantErr != "" {
 				ms.Error(err, "did not get expected error")
 				ms.Contains(err.Error(), tt.wantErr)
@@ -398,7 +398,7 @@ func (ms *ModelSuite) TestMeeting_AttachImage() {
 	}
 }
 
-func (ms *ModelSuite) TestMeeting_GetImage() {
+func (ms *ModelSuite) TestMeeting_ImageFile() {
 	user := User{}
 	createFixture(ms, &user)
 
@@ -415,14 +415,18 @@ func (ms *ModelSuite) TestMeeting_GetImage() {
 	}
 	createFixture(ms, &meeting)
 
+	f, err := meeting.ImageFile()
+	ms.NoError(err, "unexpected error from Meeting.ImageFile()")
+	ms.Nil(f, "expected nil returned from Meeting.ImageFile()")
+
 	var imageFixture File
 	const filename = "photo.gif"
 	ms.Nil(imageFixture.Store(filename, []byte("GIF89a")), "failed to create file fixture")
 
-	attachedFile, err := meeting.AttachImage(imageFixture.UUID.String())
+	attachedFile, err := meeting.SetImageFile(imageFixture.UUID.String())
 	ms.NoError(err)
 
-	if got, err := meeting.GetImage(); err == nil {
+	if got, err := meeting.ImageFile(); err == nil {
 		ms.Equal(attachedFile.UUID.String(), got.UUID.String())
 		ms.True(got.URLExpiration.After(time.Now().Add(time.Minute)))
 		ms.Equal(filename, got.Name)
@@ -527,7 +531,7 @@ func (ms *ModelSuite) TestMeeting_GetPosts() {
 	}
 	for _, tt := range tests {
 		ms.T().Run(tt.name, func(t *testing.T) {
-			got, err := tt.meeting.GetPosts()
+			got, err := tt.meeting.Posts()
 			if tt.wantErr != "" {
 				ms.Error(err, "did not get expected error")
 				ms.Contains(err.Error(), tt.wantErr)
@@ -559,13 +563,13 @@ func (ms *ModelSuite) TestMeeting_Invites() {
 			name:       "creator",
 			user:       f.Users[0],
 			meeting:    f.Meetings[0],
-			wantEmails: []string{"invitee0@example.com", "invitee1@example.com"},
+			wantEmails: []string{f.MeetingInvites[0].Email, f.MeetingInvites[1].Email},
 		},
 		{
 			name:       "organizer",
 			user:       f.Users[1],
 			meeting:    f.Meetings[0],
-			wantEmails: []string{"invitee0@example.com", "invitee1@example.com"},
+			wantEmails: []string{f.MeetingInvites[0].Email, f.MeetingInvites[1].Email},
 		},
 		{
 			name:       "invitee",
@@ -773,6 +777,7 @@ func (ms *ModelSuite) TestMeeting_RemoveInvite() {
 		})
 	}
 }
+
 func (ms *ModelSuite) TestMeeting_RemoveParticipant() {
 	f := createMeetingFixtures(ms.DB, 2)
 
@@ -829,6 +834,87 @@ func (ms *ModelSuite) TestMeeting_RemoveParticipant() {
 			ms.Equal(tt.remainingParticipants, ids)
 
 			// teardown
+		})
+	}
+}
+
+func (ms *ModelSuite) TestMeeting_isCodeValid() {
+	code := domain.GetUUID()
+
+	tests := []struct {
+		name    string
+		meeting Meeting
+		code    string
+		want    bool
+	}{
+		{
+			name:    "yes",
+			meeting: Meeting{InviteCode: nulls.NewUUID(code)},
+			code:    code.String(),
+			want:    true,
+		},
+		{
+			name:    "wrong code",
+			meeting: Meeting{InviteCode: nulls.NewUUID(domain.GetUUID())},
+			code:    code.String(),
+			want:    false,
+		},
+		{
+			name:    "null-value code",
+			meeting: Meeting{InviteCode: nulls.NewUUID(uuid.Nil)},
+			code:    code.String(),
+			want:    false,
+		},
+		{
+			name:    "invalid code",
+			meeting: Meeting{InviteCode: nulls.UUID{}},
+			code:    code.String(),
+			want:    false,
+		},
+	}
+	for _, tt := range tests {
+		ms.T().Run(tt.name, func(t *testing.T) {
+			ms.Equal(tt.want, tt.meeting.IsCodeValid(tt.code), "IsCodeValid returned incorrect result")
+		})
+	}
+}
+
+func (ms *ModelSuite) TestMeeting_isOrganizer() {
+	f := createMeetingFixtures(ms.DB, 2)
+
+	tests := []struct {
+		name    string
+		user    User
+		meeting Meeting
+		want    bool
+	}{
+		{
+			name:    "creator",
+			user:    f.Users[0],
+			meeting: f.Meetings[0],
+			want:    false,
+		},
+		{
+			name:    "organizer",
+			user:    f.Users[1],
+			meeting: f.Meetings[0],
+			want:    true,
+		},
+		{
+			name:    "participant",
+			user:    f.Users[2],
+			meeting: f.Meetings[0],
+			want:    false,
+		},
+	}
+	for _, tt := range tests {
+		ms.T().Run(tt.name, func(t *testing.T) {
+			ctx := &testBuffaloContext{
+				params: map[interface{}]interface{}{},
+			}
+			ctx.Set("current_user", tt.user)
+			got := tt.meeting.isOrganizer(ctx, tt.user.ID)
+			ms.Equal(tt.want, got)
 		})
 	}
 }

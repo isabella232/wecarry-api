@@ -95,7 +95,7 @@ func (r *meetingResolver) ImageFile(ctx context.Context, obj *models.Meeting) (*
 		return nil, nil
 	}
 
-	image, err := obj.GetImage()
+	image, err := obj.ImageFile()
 	if err != nil {
 		return nil, domain.ReportError(ctx, err, "GetMeetingImage")
 	}
@@ -107,7 +107,7 @@ func (r *meetingResolver) Posts(ctx context.Context, obj *models.Meeting) ([]mod
 	if obj == nil {
 		return nil, nil
 	}
-	posts, err := obj.GetPosts()
+	posts, err := obj.Posts()
 	if err != nil {
 		return nil, domain.ReportError(ctx, err, "Meeting.Posts")
 	}
@@ -118,7 +118,7 @@ func (r *meetingResolver) Invites(ctx context.Context, obj *models.Meeting) ([]m
 	if obj == nil {
 		return nil, nil
 	}
-	invites, err := obj.Invites(domain.GetBuffaloContextFromGqlContext(ctx))
+	invites, err := obj.Invites(domain.GetBuffaloContext(ctx))
 	if err != nil {
 		return nil, domain.ReportError(ctx, err, "Meeting.Invites")
 	}
@@ -129,7 +129,7 @@ func (r *meetingResolver) Participants(ctx context.Context, obj *models.Meeting)
 	if obj == nil {
 		return nil, nil
 	}
-	participants, err := obj.Participants(domain.GetBuffaloContextFromGqlContext(ctx))
+	participants, err := obj.Participants(domain.GetBuffaloContext(ctx))
 	if err != nil {
 		return nil, domain.ReportError(ctx, err, "Meeting.Participants")
 	}
@@ -144,7 +144,7 @@ func (r *meetingResolver) Organizers(ctx context.Context, obj *models.Meeting) (
 	if obj == nil {
 		return nil, nil
 	}
-	users, err := obj.Organizers(domain.GetBuffaloContextFromGqlContext(ctx))
+	users, err := obj.Organizers(domain.GetBuffaloContext(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -230,10 +230,8 @@ func convertGqlMeetingInputToDBMeeting(ctx context.Context, input meetingInput, 
 	}
 
 	if input.ImageFileID != nil {
-		if file, err := meeting.AttachImage(*input.ImageFileID); err != nil {
+		if _, err := meeting.SetImageFile(*input.ImageFileID); err != nil {
 			graphql.AddError(ctx, gqlerror.Errorf("Error attaching image file to Meeting, %s", err.Error()))
-		} else {
-			meeting.ImageFile = file
 		}
 	}
 
