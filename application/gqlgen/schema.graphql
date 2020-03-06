@@ -635,7 +635,7 @@ type Post {
     "Profile of the user that is the provider for this post. For offers, this is the same as `createdBy`."
     provider: PublicProfile
     "Users that have offered to carry this request."
-    potentialProviders: [PublicProfile!]
+    potentialProviders: [potentialProvider!]
     "Organization associated with this post."
     organization: Organization
     "Short description of item, limited to 255 characters"

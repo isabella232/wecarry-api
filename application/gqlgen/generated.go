@@ -345,7 +345,7 @@ type PostResolver interface {
 	CreatedBy(ctx context.Context, obj *models.Post) (*PublicProfile, error)
 	Receiver(ctx context.Context, obj *models.Post) (*PublicProfile, error)
 	Provider(ctx context.Context, obj *models.Post) (*PublicProfile, error)
-	PotentialProviders(ctx context.Context, obj *models.Post) ([]PublicProfile, error)
+	PotentialProviders(ctx context.Context, obj *models.Post) ([]PotentialProvider, error)
 	Organization(ctx context.Context, obj *models.Post) (*models.Organization, error)
 
 	Description(ctx context.Context, obj *models.Post) (*string, error)
@@ -2339,7 +2339,7 @@ type Post {
     "Profile of the user that is the provider for this post. For offers, this is the same as ` + "`" + `createdBy` + "`" + `."
     provider: PublicProfile
     "Users that have offered to carry this request."
-    potentialProviders: [PublicProfile!]
+    potentialProviders: [potentialProvider!]
     "Organization associated with this post."
     organization: Organization
     "Short description of item, limited to 255 characters"
@@ -6362,10 +6362,10 @@ func (ec *executionContext) _Post_potentialProviders(ctx context.Context, field 
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.([]PublicProfile)
+	res := resTmp.([]PotentialProvider)
 	rctx.Result = res
 	ctx = ec.Tracer.StartFieldChildExecution(ctx)
-	return ec.marshalOPublicProfile2ᚕgithubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐPublicProfile(ctx, field.Selections, res)
+	return ec.marshalOpotentialProvider2ᚕgithubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐPotentialProvider(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Post_organization(ctx context.Context, field graphql.CollectedField, obj *models.Post) (ret graphql.Marshaler) {
@@ -14187,6 +14187,10 @@ func (ec *executionContext) marshalN__TypeKind2string(ctx context.Context, sel a
 	return res
 }
 
+func (ec *executionContext) marshalNpotentialProvider2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐPotentialProvider(ctx context.Context, sel ast.SelectionSet, v PotentialProvider) graphql.Marshaler {
+	return ec._potentialProvider(ctx, sel, &v)
+}
+
 func (ec *executionContext) unmarshalOBoolean2bool(ctx context.Context, v interface{}) (bool, error) {
 	return graphql.UnmarshalBoolean(v)
 }
@@ -14457,46 +14461,6 @@ func (ec *executionContext) marshalOPublicProfile2githubᚗcomᚋsilinternationa
 	return ec._PublicProfile(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalOPublicProfile2ᚕgithubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐPublicProfile(ctx context.Context, sel ast.SelectionSet, v []PublicProfile) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		rctx := &graphql.ResolverContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithResolverContext(ctx, rctx)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalNPublicProfile2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐPublicProfile(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
-	return ret
-}
-
 func (ec *executionContext) marshalOPublicProfile2ᚖgithubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐPublicProfile(ctx context.Context, sel ast.SelectionSet, v *PublicProfile) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -14739,6 +14703,46 @@ func (ec *executionContext) marshalO__Type2ᚖgithubᚗcomᚋ99designsᚋgqlgen�
 		return graphql.Null
 	}
 	return ec.___Type(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOpotentialProvider2ᚕgithubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐPotentialProvider(ctx context.Context, sel ast.SelectionSet, v []PotentialProvider) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		rctx := &graphql.ResolverContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithResolverContext(ctx, rctx)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNpotentialProvider2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐPotentialProvider(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+	return ret
 }
 
 // endregion ***************************** type.gotpl *****************************
