@@ -277,10 +277,6 @@ func (p *Post) SetProviderWithStatus(status PostStatus, providerID *string) erro
 
 // GetPotentialProviders returns the PotentialProvider objects associated with the Post
 func (p *Post) GetPotentialProviders() (PotentialProviders, error) {
-	if p.Type != PostTypeRequest {
-		return PotentialProviders{}, nil
-	}
-
 	providers := PotentialProviders{}
 	if err := DB.Eager("User").Where("post_id = ?", p.ID).All(&providers); err != nil {
 		if domain.IsOtherThanNoRows(err) {
