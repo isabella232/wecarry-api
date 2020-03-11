@@ -47,7 +47,7 @@ type CreateOrganizationDomainInput struct {
 	// ID of the Organization that owns this domain
 	OrganizationID string `json:"organizationID"`
 	// Authentication type, overriding the Organization's `authType`. Can be: `saml`, `google`, `azureadv2`.
-	AuthType *string `json:"authType"`
+	AuthType models.AuthType `json:"authType"`
 	// Authentication configuration, overriding the Organization's `authConfig. See
 	// https://github.com/silinternational/wecarry-api/blob/master/README.md
 	AuthConfig *string `json:"authConfig"`
@@ -59,7 +59,7 @@ type CreateOrganizationInput struct {
 	// Website URL of the Organization, limited to 255 characters
 	URL *string `json:"url"`
 	// Authentication type for the organization. Can be `saml`, `google`, or `azureadv2`.
-	AuthType string `json:"authType"`
+	AuthType models.AuthType `json:"authType"`
 	// Authentication configuration. See https://github.com/silinternational/wecarry-api/blob/master/README.md
 	AuthConfig string `json:"authConfig"`
 	// ID of pre-stored image logo file. Upload using the `upload` REST API endpoint.
@@ -152,7 +152,7 @@ type UpdateOrganizationInput struct {
 	// Website URL of the Organization, limited to 255 characters. If omitted, existing URL is erased.
 	URL *string `json:"url"`
 	// Authentication type for the organization. Can be 'saml', 'google', or 'azureadv2'.
-	AuthType string `json:"authType"`
+	AuthType models.AuthType `json:"authType"`
 	// Authentication configuration. See https://github.com/silinternational/wecarry-api/blob/master/README.md
 	AuthConfig string `json:"authConfig"`
 	// ID of image logo file. Upload using the `upload` REST API endpoint. If omitted, existing logo is erased.
@@ -256,21 +256,18 @@ type PostRole string
 const (
 	// Posts created by the User
 	PostRoleCreatedby PostRole = "CREATEDBY"
-	// Posts to be received by the User
-	PostRoleReceiving PostRole = "RECEIVING"
 	// Posts provided by the User. Posts where the user is a PotentialProvider are not included.
 	PostRoleProviding PostRole = "PROVIDING"
 )
 
 var AllPostRole = []PostRole{
 	PostRoleCreatedby,
-	PostRoleReceiving,
 	PostRoleProviding,
 }
 
 func (e PostRole) IsValid() bool {
 	switch e {
-	case PostRoleCreatedby, PostRoleReceiving, PostRoleProviding:
+	case PostRoleCreatedby, PostRoleProviding:
 		return true
 	}
 	return false

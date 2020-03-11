@@ -17,6 +17,8 @@ autobind:
   - github.com/silinternational/wecarry-api/models
   - github.com/silinternational/wecarry-api/gqlgen
 models:
+  AuthType:
+    model: models.AuthType
   File:
     model: models.File
     fields:
@@ -115,8 +117,6 @@ models:
     model: models.PostSize
   PostStatus:
     model: models.PostStatus
-  PostType:
-    model: models.PostType
   PostVisibility:
     model: models.PostVisibility
   Thread:

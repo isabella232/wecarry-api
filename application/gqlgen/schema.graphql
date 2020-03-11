@@ -206,6 +206,18 @@ scalar Date
 "Date and Time in ISO-8601 format (e.g. 2020-02-11T18:08:56Z)"
 scalar Time
 
+"Authorization types"
+enum AuthType {
+    "Microsoft Azure AD (Office 365)"
+    AZURADV2
+    "Default to Organization's AuthType (only valid on OrganizationDomain)"
+    DEFAULT
+    "Google OAUTH 2.0"
+    GOOGLE
+    "SAML 2.0"
+    SAML
+}
+
 "Visibility for Meetings (Events), determines who can see a `Meeting`."
 enum MeetingVisibility {
     "Visible to invitees and all app users"
@@ -222,8 +234,6 @@ enum MeetingVisibility {
 enum PostRole {
     "Posts created by the User"
     CREATEDBY
-    "Posts to be received by the User"
-    RECEIVING
     "Posts provided by the User. Posts where the user is a PotentialProvider are not included."
     PROVIDING
 }
@@ -256,12 +266,6 @@ enum PostStatus {
     COMPLETED
     "Removed: the request was canceled (removed) by the receiver"
     REMOVED
-}
-
-"DEPRECATED: Only posts of type REQUEST are valid"
-enum PostType {
-    REQUEST
-    OFFER @deprecated(reason: "Offer-type Posts have not been implemented, and will be implemented separately.")
 }
 
 "Visibility for Posts, ALL organizations, TRUSTED organizations, or SAME organization only"
@@ -549,7 +553,7 @@ input CreateOrganizationInput {
     "Website URL of the Organization, limited to 255 characters"
     url: String
     "Authentication type for the organization. Can be `saml`, `google`, or `azureadv2`."
-    authType: String!
+    authType: AuthType!
     "Authentication configuration. See https://github.com/silinternational/wecarry-api/blob/master/README.md"
     authConfig: String!
     "ID of pre-stored image logo file. Upload using the `upload` REST API endpoint."
@@ -564,7 +568,7 @@ input UpdateOrganizationInput {
     "Website URL of the Organization, limited to 255 characters. If omitted, existing URL is erased."
     url: String
     "Authentication type for the organization. Can be 'saml', 'google', or 'azureadv2'."
-    authType: String!
+    authType: AuthType!
     "Authentication configuration. See https://github.com/silinternational/wecarry-api/blob/master/README.md"
     authConfig: String!
     "ID of image logo file. Upload using the `upload` REST API endpoint. If omitted, existing logo is erased."
@@ -581,7 +585,7 @@ type OrganizationDomain {
     "Organization that owns this domain"
     organization: Organization!
     "Authentication type, overriding the Organization's `authType`. Can be: `saml`, `google`, `azureadv2`."
-    authType: String!
+    authType: AuthType!
     """
     Authentication configuration, overriding the Organization's `authConfig. See
     https://github.com/silinternational/wecarry-api/blob/master/README.md
@@ -595,7 +599,7 @@ input CreateOrganizationDomainInput {
     "ID of the Organization that owns this domain"
     organizationID: ID!
     "Authentication type, overriding the Organization's `authType`. Can be: `saml`, `google`, `azureadv2`."
-    authType: String
+    authType: AuthType!
     """
     Authentication configuration, overriding the Organization's `authConfig. See
     https://github.com/silinternational/wecarry-api/blob/master/README.md
@@ -627,12 +631,9 @@ input RemoveOrganizationTrustInput {
 type Post {
     "unique identifier for the Post (Request)"
     id: ID!
-    type: PostType! @deprecated(reason: "Offer-type Posts will be implemented separately.")
     "Profile of the user that created this post."
     createdBy: PublicProfile!
-    "Profile of the user that is receiver of this post. For requests, this is the same as `createdBy`."
-    receiver: PublicProfile
-    "Profile of the user that is the provider for this post. For offers, this is the same as `createdBy`."
+    "Profile of the user that is the provider for this post."
     provider: PublicProfile
     "Users that have offered to carry this request."
     potentialProviders: [potentialProvider!]
@@ -681,8 +682,6 @@ type Post {
 input CreatePostInput {
     "ID of associated Organization. Affects visibility of the post, see also the `visibility` field."
     orgID: String!
-    "DEPRECATED: Must be REQUEST"
-    type: PostType!
     "Short description, limited to 255 characters"
     title: String!
     "Optional, longer description, limited to 4096 characters"

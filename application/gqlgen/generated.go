@@ -179,12 +179,10 @@ type ComplexityRoot struct {
 		PhotoID            func(childComplexity int) int
 		PotentialProviders func(childComplexity int) int
 		Provider           func(childComplexity int) int
-		Receiver           func(childComplexity int) int
 		Size               func(childComplexity int) int
 		Status             func(childComplexity int) int
 		Threads            func(childComplexity int) int
 		Title              func(childComplexity int) int
-		Type               func(childComplexity int) int
 		URL                func(childComplexity int) int
 		UpdatedAt          func(childComplexity int) int
 		Visibility         func(childComplexity int) int
@@ -341,9 +339,7 @@ type OrganizationDomainResolver interface {
 }
 type PostResolver interface {
 	ID(ctx context.Context, obj *models.Post) (string, error)
-
 	CreatedBy(ctx context.Context, obj *models.Post) (*PublicProfile, error)
-	Receiver(ctx context.Context, obj *models.Post) (*PublicProfile, error)
 	Provider(ctx context.Context, obj *models.Post) (*PublicProfile, error)
 	PotentialProviders(ctx context.Context, obj *models.Post) ([]PotentialProvider, error)
 	Organization(ctx context.Context, obj *models.Post) (*models.Organization, error)
@@ -1208,13 +1204,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Post.Provider(childComplexity), true
 
-	case "Post.receiver":
-		if e.complexity.Post.Receiver == nil {
-			break
-		}
-
-		return e.complexity.Post.Receiver(childComplexity), true
-
 	case "Post.size":
 		if e.complexity.Post.Size == nil {
 			break
@@ -1242,13 +1231,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Post.Title(childComplexity), true
-
-	case "Post.type":
-		if e.complexity.Post.Type == nil {
-			break
-		}
-
-		return e.complexity.Post.Type(childComplexity), true
 
 	case "Post.url":
 		if e.complexity.Post.URL == nil {
@@ -1910,6 +1892,18 @@ scalar Date
 "Date and Time in ISO-8601 format (e.g. 2020-02-11T18:08:56Z)"
 scalar Time
 
+"Authorization types"
+enum AuthType {
+    "Microsoft Azure AD (Office 365)"
+    AZURADV2
+    "Default to Organization's AuthType (only valid on OrganizationDomain)"
+    DEFAULT
+    "Google OAUTH 2.0"
+    GOOGLE
+    "SAML 2.0"
+    SAML
+}
+
 "Visibility for Meetings (Events), determines who can see a ` + "`" + `Meeting` + "`" + `."
 enum MeetingVisibility {
     "Visible to invitees and all app users"
@@ -1926,8 +1920,6 @@ enum MeetingVisibility {
 enum PostRole {
     "Posts created by the User"
     CREATEDBY
-    "Posts to be received by the User"
-    RECEIVING
     "Posts provided by the User. Posts where the user is a PotentialProvider are not included."
     PROVIDING
 }
@@ -1960,12 +1952,6 @@ enum PostStatus {
     COMPLETED
     "Removed: the request was canceled (removed) by the receiver"
     REMOVED
-}
-
-"DEPRECATED: Only posts of type REQUEST are valid"
-enum PostType {
-    REQUEST
-    OFFER @deprecated(reason: "Offer-type Posts have not been implemented, and will be implemented separately.")
 }
 
 "Visibility for Posts, ALL organizations, TRUSTED organizations, or SAME organization only"
@@ -2253,7 +2239,7 @@ input CreateOrganizationInput {
     "Website URL of the Organization, limited to 255 characters"
     url: String
     "Authentication type for the organization. Can be ` + "`" + `saml` + "`" + `, ` + "`" + `google` + "`" + `, or ` + "`" + `azureadv2` + "`" + `."
-    authType: String!
+    authType: AuthType!
     "Authentication configuration. See https://github.com/silinternational/wecarry-api/blob/master/README.md"
     authConfig: String!
     "ID of pre-stored image logo file. Upload using the ` + "`" + `upload` + "`" + ` REST API endpoint."
@@ -2268,7 +2254,7 @@ input UpdateOrganizationInput {
     "Website URL of the Organization, limited to 255 characters. If omitted, existing URL is erased."
     url: String
     "Authentication type for the organization. Can be 'saml', 'google', or 'azureadv2'."
-    authType: String!
+    authType: AuthType!
     "Authentication configuration. See https://github.com/silinternational/wecarry-api/blob/master/README.md"
     authConfig: String!
     "ID of image logo file. Upload using the ` + "`" + `upload` + "`" + ` REST API endpoint. If omitted, existing logo is erased."
@@ -2285,7 +2271,7 @@ type OrganizationDomain {
     "Organization that owns this domain"
     organization: Organization!
     "Authentication type, overriding the Organization's ` + "`" + `authType` + "`" + `. Can be: ` + "`" + `saml` + "`" + `, ` + "`" + `google` + "`" + `, ` + "`" + `azureadv2` + "`" + `."
-    authType: String!
+    authType: AuthType!
     """
     Authentication configuration, overriding the Organization's ` + "`" + `authConfig. See
     https://github.com/silinternational/wecarry-api/blob/master/README.md
@@ -2299,7 +2285,7 @@ input CreateOrganizationDomainInput {
     "ID of the Organization that owns this domain"
     organizationID: ID!
     "Authentication type, overriding the Organization's ` + "`" + `authType` + "`" + `. Can be: ` + "`" + `saml` + "`" + `, ` + "`" + `google` + "`" + `, ` + "`" + `azureadv2` + "`" + `."
-    authType: String
+    authType: AuthType!
     """
     Authentication configuration, overriding the Organization's ` + "`" + `authConfig. See
     https://github.com/silinternational/wecarry-api/blob/master/README.md
@@ -2331,12 +2317,8 @@ input RemoveOrganizationTrustInput {
 type Post {
     "unique identifier for the Post (Request)"
     id: ID!
-    type: PostType! @deprecated(reason: "Offer-type Posts will be implemented separately.")
-    "Profile of the user that created this post."
     createdBy: PublicProfile!
-    "Profile of the user that is receiver of this post. For requests, this is the same as ` + "`" + `createdBy` + "`" + `."
-    receiver: PublicProfile
-    "Profile of the user that is the provider for this post. For offers, this is the same as ` + "`" + `createdBy` + "`" + `."
+    "Profile of the user that is the provider for this post."
     provider: PublicProfile
     "Users that have offered to carry this request."
     potentialProviders: [potentialProvider!]
@@ -2385,8 +2367,6 @@ type Post {
 input CreatePostInput {
     "ID of associated Organization. Affects visibility of the post, see also the ` + "`" + `visibility` + "`" + ` field."
     orgID: String!
-    "DEPRECATED: Must be REQUEST"
-    type: PostType!
     "Short description, limited to 255 characters"
     title: String!
     "Optional, longer description, limited to 4096 characters"
@@ -6112,10 +6092,10 @@ func (ec *executionContext) _OrganizationDomain_authType(ctx context.Context, fi
 		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(models.AuthType)
 	rctx.Result = res
 	ctx = ec.Tracer.StartFieldChildExecution(ctx)
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalNAuthType2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋmodelsᚐAuthType(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _OrganizationDomain_authConfig(ctx context.Context, field graphql.CollectedField, obj *models.OrganizationDomain) (ret graphql.Marshaler) {
@@ -6192,43 +6172,6 @@ func (ec *executionContext) _Post_id(ctx context.Context, field graphql.Collecte
 	return ec.marshalNID2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Post_type(ctx context.Context, field graphql.CollectedField, obj *models.Post) (ret graphql.Marshaler) {
-	ctx = ec.Tracer.StartFieldExecution(ctx, field)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-		ec.Tracer.EndFieldExecution(ctx)
-	}()
-	rctx := &graphql.ResolverContext{
-		Object:   "Post",
-		Field:    field,
-		Args:     nil,
-		IsMethod: false,
-	}
-	ctx = graphql.WithResolverContext(ctx, rctx)
-	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Type, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !ec.HasError(rctx) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(models.PostType)
-	rctx.Result = res
-	ctx = ec.Tracer.StartFieldChildExecution(ctx)
-	return ec.marshalNPostType2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋmodelsᚐPostType(ctx, field.Selections, res)
-}
-
 func (ec *executionContext) _Post_createdBy(ctx context.Context, field graphql.CollectedField, obj *models.Post) (ret graphql.Marshaler) {
 	ctx = ec.Tracer.StartFieldExecution(ctx, field)
 	defer func() {
@@ -6264,40 +6207,6 @@ func (ec *executionContext) _Post_createdBy(ctx context.Context, field graphql.C
 	rctx.Result = res
 	ctx = ec.Tracer.StartFieldChildExecution(ctx)
 	return ec.marshalNPublicProfile2ᚖgithubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐPublicProfile(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Post_receiver(ctx context.Context, field graphql.CollectedField, obj *models.Post) (ret graphql.Marshaler) {
-	ctx = ec.Tracer.StartFieldExecution(ctx, field)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-		ec.Tracer.EndFieldExecution(ctx)
-	}()
-	rctx := &graphql.ResolverContext{
-		Object:   "Post",
-		Field:    field,
-		Args:     nil,
-		IsMethod: true,
-	}
-	ctx = graphql.WithResolverContext(ctx, rctx)
-	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Post().Receiver(rctx, obj)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*PublicProfile)
-	rctx.Result = res
-	ctx = ec.Tracer.StartFieldChildExecution(ctx)
-	return ec.marshalOPublicProfile2ᚖgithubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐPublicProfile(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Post_provider(ctx context.Context, field graphql.CollectedField, obj *models.Post) (ret graphql.Marshaler) {
@@ -10233,7 +10142,7 @@ func (ec *executionContext) unmarshalInputCreateOrganizationDomainInput(ctx cont
 			}
 		case "authType":
 			var err error
-			it.AuthType, err = ec.unmarshalOString2ᚖstring(ctx, v)
+			it.AuthType, err = ec.unmarshalNAuthType2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋmodelsᚐAuthType(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -10269,7 +10178,7 @@ func (ec *executionContext) unmarshalInputCreateOrganizationInput(ctx context.Co
 			}
 		case "authType":
 			var err error
-			it.AuthType, err = ec.unmarshalNString2string(ctx, v)
+			it.AuthType, err = ec.unmarshalNAuthType2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋmodelsᚐAuthType(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -10324,12 +10233,6 @@ func (ec *executionContext) unmarshalInputCreatePostInput(ctx context.Context, o
 		case "orgID":
 			var err error
 			it.OrgID, err = ec.unmarshalNString2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-		case "type":
-			var err error
-			it.Type, err = ec.unmarshalNPostType2ᚖgithubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋmodelsᚐPostType(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -10719,7 +10622,7 @@ func (ec *executionContext) unmarshalInputUpdateOrganizationInput(ctx context.Co
 			}
 		case "authType":
 			var err error
-			it.AuthType, err = ec.unmarshalNString2string(ctx, v)
+			it.AuthType, err = ec.unmarshalNAuthType2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋmodelsᚐAuthType(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -11808,11 +11711,6 @@ func (ec *executionContext) _Post(ctx context.Context, sel ast.SelectionSet, obj
 				}
 				return res
 			})
-		case "type":
-			out.Values[i] = ec._Post_type(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				atomic.AddUint32(&invalids, 1)
-			}
 		case "createdBy":
 			field := field
 			out.Concurrently(i, func() (res graphql.Marshaler) {
@@ -11825,17 +11723,6 @@ func (ec *executionContext) _Post(ctx context.Context, sel ast.SelectionSet, obj
 				if res == graphql.Null {
 					atomic.AddUint32(&invalids, 1)
 				}
-				return res
-			})
-		case "receiver":
-			field := field
-			out.Concurrently(i, func() (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Post_receiver(ctx, field, obj)
 				return res
 			})
 		case "provider":
@@ -12970,6 +12857,15 @@ func (ec *executionContext) _potentialProvider(ctx context.Context, sel ast.Sele
 
 // region    ***************************** type.gotpl *****************************
 
+func (ec *executionContext) unmarshalNAuthType2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋmodelsᚐAuthType(ctx context.Context, v interface{}) (models.AuthType, error) {
+	var res models.AuthType
+	return res, res.UnmarshalGQL(v)
+}
+
+func (ec *executionContext) marshalNAuthType2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋmodelsᚐAuthType(ctx context.Context, sel ast.SelectionSet, v models.AuthType) graphql.Marshaler {
+	return v
+}
+
 func (ec *executionContext) unmarshalNBoolean2bool(ctx context.Context, v interface{}) (bool, error) {
 	return graphql.UnmarshalBoolean(v)
 }
@@ -13559,33 +13455,6 @@ func (ec *executionContext) unmarshalNPostStatus2githubᚗcomᚋsilinternational
 }
 
 func (ec *executionContext) marshalNPostStatus2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋmodelsᚐPostStatus(ctx context.Context, sel ast.SelectionSet, v models.PostStatus) graphql.Marshaler {
-	return v
-}
-
-func (ec *executionContext) unmarshalNPostType2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋmodelsᚐPostType(ctx context.Context, v interface{}) (models.PostType, error) {
-	var res models.PostType
-	return res, res.UnmarshalGQL(v)
-}
-
-func (ec *executionContext) marshalNPostType2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋmodelsᚐPostType(ctx context.Context, sel ast.SelectionSet, v models.PostType) graphql.Marshaler {
-	return v
-}
-
-func (ec *executionContext) unmarshalNPostType2ᚖgithubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋmodelsᚐPostType(ctx context.Context, v interface{}) (*models.PostType, error) {
-	if v == nil {
-		return nil, nil
-	}
-	res, err := ec.unmarshalNPostType2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋmodelsᚐPostType(ctx, v)
-	return &res, err
-}
-
-func (ec *executionContext) marshalNPostType2ᚖgithubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋmodelsᚐPostType(ctx context.Context, sel ast.SelectionSet, v *models.PostType) graphql.Marshaler {
-	if v == nil {
-		if !ec.HasError(graphql.GetResolverContext(ctx)) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
 	return v
 }
 
