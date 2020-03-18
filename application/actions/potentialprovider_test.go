@@ -12,12 +12,10 @@ func (as *ActionSuite) Test_AddMeAsPotentialProvider() {
 
 	f := test.CreatePotentialProvidersFixtures(as.DB)
 	posts := f.Posts
-	const qTemplate = `mutation {post: addMeAsPotentialProvider ` +
-		`(input: {postID: "%s" deliveryAfter: "%s" deliveryBefore: "%s"})` +
+	const qTemplate = `mutation {request: addMeAsPotentialProvider ` +
+		`(input: {requestID: "%s" deliveryAfter: "%s" deliveryBefore: "%s"})` +
 		` {id title potentialProviders{user{id nickname} deliveryAfter deliveryBefore}}}`
 
-	const qTemplate = `mutation {request: addMeAsPotentialProvider (requestID: "%s")` +
-		` {id title potentialProviders{id nickname}}}`
 	deliveryAfter := time.Now().Add(domain.DurationWeek).Format(domain.DateFormat)
 	deliveryBefore := time.Now().Add(2 * domain.DurationWeek).Format(domain.DateFormat)
 
@@ -31,12 +29,10 @@ func (as *ActionSuite) Test_AddMeAsPotentialProvider() {
 	as.Equal(posts[2].UUID.String(), resp.Request.ID, "incorrect Post UUID")
 	as.Equal(posts[2].Title, resp.Request.Title, "incorrect Post title")
 
-	want := []PotentialProvider{{ID: f.Users[1].UUID.String(), Nickname: f.Users[1].Nickname}}
-	as.Equal(want, resp.Request.PotentialProviders, "incorrect potential providers")
 	want := []PotentialProvider{
 		{User: PublicProfile{ID: f.Users[1].UUID.String(), Nickname: f.Users[1].Nickname},
 			DeliveryAfter: deliveryAfter, DeliveryBefore: deliveryBefore}}
-	as.Equal(want, resp.Post.PotentialProviders, "incorrect potential providers")
+	as.Equal(want, resp.Request.PotentialProviders, "incorrect potential providers")
 
 	// Add one to Post with two already
 	deliveryBefore = time.Now().Add(3 * domain.DurationWeek).Format(domain.DateFormat)
@@ -92,8 +88,6 @@ func (as *ActionSuite) Test_RemoveMeAsPotentialProvider() {
 	posts := f.Posts
 
 	const qTemplate = `mutation {request: removeMeAsPotentialProvider (requestID: "%s")` +
-		` {id title potentialProviders{id nickname}}}`
-	const qTemplate = `mutation {post: removeMeAsPotentialProvider (postID: "%s")` +
 		` {id title potentialProviders{user{id nickname}}}}`
 
 	var resp RequestResponse
@@ -105,11 +99,9 @@ func (as *ActionSuite) Test_RemoveMeAsPotentialProvider() {
 	as.Equal(posts[1].UUID.String(), resp.Request.ID, "incorrect Post UUID")
 	as.Equal(posts[1].Title, resp.Request.Title, "incorrect Post title")
 
-	want := []PotentialProvider{{ID: f.Users[3].UUID.String(), Nickname: f.Users[3].Nickname}}
-	as.Equal(want, resp.Request.PotentialProviders, "incorrect potential providers")
 	want := []PotentialProvider{
 		{User: PublicProfile{ID: f.Users[3].UUID.String(), Nickname: f.Users[3].Nickname}}}
-	as.Equal(want, resp.Post.PotentialProviders, "incorrect potential providers")
+	as.Equal(want, resp.Request.PotentialProviders, "incorrect potential providers")
 }
 
 func (as *ActionSuite) Test_RemovePotentialProvider() {
@@ -118,8 +110,6 @@ func (as *ActionSuite) Test_RemovePotentialProvider() {
 	posts := f.Posts
 
 	const qTemplate = `mutation {request: removePotentialProvider (requestID: "%s", userID: "%s")` +
-		` {id title potentialProviders{id nickname}}}`
-	const qTemplate = `mutation {post: removePotentialProvider (postID: "%s", userID: "%s")` +
 		` {id title potentialProviders{user{id nickname}}}}`
 
 	var resp RequestResponse
@@ -132,9 +122,7 @@ func (as *ActionSuite) Test_RemovePotentialProvider() {
 	as.Equal(posts[1].UUID.String(), resp.Request.ID, "incorrect Post UUID")
 	as.Equal(posts[1].Title, resp.Request.Title, "incorrect Post title")
 
-	want := []PotentialProvider{{ID: f.Users[3].UUID.String(), Nickname: f.Users[3].Nickname}}
-	as.Equal(want, resp.Request.PotentialProviders, "incorrect potential providers")
 	want := []PotentialProvider{
 		{User: PublicProfile{ID: f.Users[3].UUID.String(), Nickname: f.Users[3].Nickname}}}
-	as.Equal(want, resp.Post.PotentialProviders, "incorrect potential providers")
+	as.Equal(want, resp.Request.PotentialProviders, "incorrect potential providers")
 }

@@ -86,7 +86,7 @@ type LocationInput struct {
 }
 
 type PotentialProviderInput struct {
-	PostID string `json:"postID"`
+	RequestID string `json:"requestID"`
 	// Date (yyyy-mm-dd) after which the request can be fufilled (NOT inclusive).
 	// DeliveryAfter must come before deliveryBefore.
 	DeliveryAfter string `json:"deliveryAfter"`

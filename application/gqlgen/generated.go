@@ -116,11 +116,7 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-<<<<<<< HEAD
 		AddMeAsPotentialProvider    func(childComplexity int, input PotentialProviderInput) int
-=======
-		AddMeAsPotentialProvider    func(childComplexity int, requestID string) int
->>>>>>> develop
 		CreateMeeting               func(childComplexity int, input meetingInput) int
 		CreateMeetingInvites        func(childComplexity int, input CreateMeetingInvitesInput) int
 		CreateMeetingParticipant    func(childComplexity int, input CreateMeetingParticipantInput) int
@@ -318,25 +314,14 @@ type MutationResolver interface {
 	UpdateOrganizationDomain(ctx context.Context, input CreateOrganizationDomainInput) ([]models.OrganizationDomain, error)
 	CreateOrganizationTrust(ctx context.Context, input CreateOrganizationTrustInput) (*models.Organization, error)
 	RemoveOrganizationTrust(ctx context.Context, input RemoveOrganizationTrustInput) (*models.Organization, error)
-<<<<<<< HEAD
-	CreatePost(ctx context.Context, input postInput) (*models.Post, error)
-	UpdatePost(ctx context.Context, input postInput) (*models.Post, error)
-	UpdatePostStatus(ctx context.Context, input UpdatePostStatusInput) (*models.Post, error)
-	AddMeAsPotentialProvider(ctx context.Context, input PotentialProviderInput) (*models.Post, error)
-	RemoveMeAsPotentialProvider(ctx context.Context, postID string) (*models.Post, error)
-	RemovePotentialProvider(ctx context.Context, postID string, userID string) (*models.Post, error)
-	MarkRequestAsDelivered(ctx context.Context, postID string) (*models.Post, error)
-	MarkRequestAsReceived(ctx context.Context, postID string) (*models.Post, error)
-=======
 	CreateRequest(ctx context.Context, input requestInput) (*models.Post, error)
 	UpdateRequest(ctx context.Context, input requestInput) (*models.Post, error)
 	UpdateRequestStatus(ctx context.Context, input UpdateRequestStatusInput) (*models.Post, error)
-	AddMeAsPotentialProvider(ctx context.Context, requestID string) (*models.Post, error)
+	AddMeAsPotentialProvider(ctx context.Context, input PotentialProviderInput) (*models.Post, error)
 	RemoveMeAsPotentialProvider(ctx context.Context, requestID string) (*models.Post, error)
 	RemovePotentialProvider(ctx context.Context, requestID string, userID string) (*models.Post, error)
 	MarkRequestAsDelivered(ctx context.Context, requestID string) (*models.Post, error)
 	MarkRequestAsReceived(ctx context.Context, requestID string) (*models.Post, error)
->>>>>>> develop
 	SetThreadLastViewedAt(ctx context.Context, input SetThreadLastViewedAtInput) (*models.Thread, error)
 	UpdateUser(ctx context.Context, input UpdateUserInput) (*models.User, error)
 	CreateWatch(ctx context.Context, input watchInput) (*models.Watch, error)
@@ -728,11 +713,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-<<<<<<< HEAD
 		return e.complexity.Mutation.AddMeAsPotentialProvider(childComplexity, args["input"].(PotentialProviderInput)), true
-=======
-		return e.complexity.Mutation.AddMeAsPotentialProvider(childComplexity, args["requestID"].(string)), true
->>>>>>> develop
 
 	case "Mutation.createMeeting":
 		if e.complexity.Mutation.CreateMeeting == nil {
@@ -1889,13 +1870,8 @@ type Mutation {
     """
     updateRequestStatus(input: UpdateRequestStatusInput!): Request!
 
-<<<<<<< HEAD
-    "Make an offer to carry a request. Only allowed if the status is OPEN and the post is visible to the auth user."
-    addMeAsPotentialProvider(input: PotentialProviderInput!): Post!
-=======
     "Make an offer to carry a request. Only allowed if the status is OPEN and the request is visible to the auth user."
-    addMeAsPotentialProvider(requestID: String!): Request!
->>>>>>> develop
+    addMeAsPotentialProvider(input: PotentialProviderInput!): Request!
 
     "Cancel a carry offer by auth user. Authorized for the request creator, the potential provider, and Super Admins."
     removeMeAsPotentialProvider(requestID: String!): Request!
@@ -2368,13 +2344,8 @@ type Request {
     "Profile of the user that is the provider for this request."
     provider: PublicProfile
     "Users that have offered to carry this request."
-<<<<<<< HEAD
     potentialProviders: [potentialProvider!]
-    "Organization associated with this post."
-=======
-    potentialProviders: [PublicProfile!]
     "Organization associated with this request."
->>>>>>> develop
     organization: Organization
     "Short description of item, limited to 255 characters"
     title: String!
@@ -2477,9 +2448,9 @@ input UpdateRequestInput {
     visibility: RequestVisibility
 }
 
-<<<<<<< HEAD
+
 input PotentialProviderInput {
-    postID: String!
+    requestID: String!
     """
     Date (yyyy-mm-dd) after which the request can be fufilled (NOT inclusive).
     DeliveryAfter must come before deliveryBefore.
@@ -2489,12 +2460,8 @@ input PotentialProviderInput {
     deliveryBefore: String!
 }
 
-input UpdatePostStatusInput {
-    "ID of the post to update"
-=======
 input UpdateRequestStatusInput {
     "ID of the request to update"
->>>>>>> develop
     id: ID!
     "New Status. Only a limited set of transitions are allowed."
     status: RequestStatus!
@@ -2638,24 +2605,14 @@ input UpdateWatchInput {
 func (ec *executionContext) field_Mutation_addMeAsPotentialProvider_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-<<<<<<< HEAD
 	var arg0 PotentialProviderInput
 	if tmp, ok := rawArgs["input"]; ok {
 		arg0, err = ec.unmarshalNPotentialProviderInput2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐPotentialProviderInput(ctx, tmp)
-=======
-	var arg0 string
-	if tmp, ok := rawArgs["requestID"]; ok {
-		arg0, err = ec.unmarshalNString2string(ctx, tmp)
->>>>>>> develop
 		if err != nil {
 			return nil, err
 		}
 	}
-<<<<<<< HEAD
 	args["input"] = arg0
-=======
-	args["requestID"] = arg0
->>>>>>> develop
 	return args, nil
 }
 
@@ -5452,11 +5409,7 @@ func (ec *executionContext) _Mutation_addMeAsPotentialProvider(ctx context.Conte
 	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-<<<<<<< HEAD
 		return ec.resolvers.Mutation().AddMeAsPotentialProvider(rctx, args["input"].(PotentialProviderInput))
-=======
-		return ec.resolvers.Mutation().AddMeAsPotentialProvider(rctx, args["requestID"].(string))
->>>>>>> develop
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -6454,17 +6407,10 @@ func (ec *executionContext) _Query_meetings(ctx context.Context, field graphql.C
 		}
 		return graphql.Null
 	}
-<<<<<<< HEAD
-	res := resTmp.([]PotentialProvider)
-	rctx.Result = res
-	ctx = ec.Tracer.StartFieldChildExecution(ctx)
-	return ec.marshalOpotentialProvider2ᚕgithubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐPotentialProvider(ctx, field.Selections, res)
-=======
 	res := resTmp.([]models.Meeting)
 	rctx.Result = res
 	ctx = ec.Tracer.StartFieldChildExecution(ctx)
 	return ec.marshalNMeeting2ᚕgithubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋmodelsᚐMeeting(ctx, field.Selections, res)
->>>>>>> develop
 }
 
 func (ec *executionContext) _Query_meeting(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -7114,10 +7060,10 @@ func (ec *executionContext) _Request_potentialProviders(ctx context.Context, fie
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.([]PublicProfile)
+	res := resTmp.([]PotentialProvider)
 	rctx.Result = res
 	ctx = ec.Tracer.StartFieldChildExecution(ctx)
-	return ec.marshalOPublicProfile2ᚕgithubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐPublicProfile(ctx, field.Selections, res)
+	return ec.marshalOpotentialProvider2ᚕgithubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐPotentialProvider(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Request_organization(ctx context.Context, field graphql.CollectedField, obj *models.Post) (ret graphql.Marshaler) {
@@ -10507,9 +10453,9 @@ func (ec *executionContext) unmarshalInputPotentialProviderInput(ctx context.Con
 
 	for k, v := range asMap {
 		switch k {
-		case "postID":
+		case "requestID":
 			var err error
-			it.PostID, err = ec.unmarshalNString2string(ctx, v)
+			it.RequestID, err = ec.unmarshalNString2string(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -13494,6 +13440,10 @@ func (ec *executionContext) marshalNOrganizationDomain2ᚕgithubᚗcomᚋsilinte
 	return ret
 }
 
+func (ec *executionContext) unmarshalNPotentialProviderInput2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐPotentialProviderInput(ctx context.Context, v interface{}) (PotentialProviderInput, error) {
+	return ec.unmarshalInputPotentialProviderInput(ctx, v)
+}
+
 func (ec *executionContext) marshalNPublicProfile2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐPublicProfile(ctx context.Context, sel ast.SelectionSet, v PublicProfile) graphql.Marshaler {
 	return ec._PublicProfile(ctx, sel, &v)
 }
@@ -13565,17 +13515,8 @@ func (ec *executionContext) unmarshalNRemoveWatchInput2githubᚗcomᚋsilinterna
 	return ec.unmarshalInputRemoveWatchInput(ctx, v)
 }
 
-<<<<<<< HEAD
-func (ec *executionContext) unmarshalNPotentialProviderInput2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐPotentialProviderInput(ctx context.Context, v interface{}) (PotentialProviderInput, error) {
-	return ec.unmarshalInputPotentialProviderInput(ctx, v)
-}
-
-func (ec *executionContext) marshalNPublicProfile2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋgqlgenᚐPublicProfile(ctx context.Context, sel ast.SelectionSet, v PublicProfile) graphql.Marshaler {
-	return ec._PublicProfile(ctx, sel, &v)
-=======
 func (ec *executionContext) marshalNRequest2githubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋmodelsᚐPost(ctx context.Context, sel ast.SelectionSet, v models.Post) graphql.Marshaler {
 	return ec._Request(ctx, sel, &v)
->>>>>>> develop
 }
 
 func (ec *executionContext) marshalNRequest2ᚕgithubᚗcomᚋsilinternationalᚋwecarryᚑapiᚋmodelsᚐPost(ctx context.Context, sel ast.SelectionSet, v []models.Post) graphql.Marshaler {

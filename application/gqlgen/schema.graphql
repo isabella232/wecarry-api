@@ -171,9 +171,7 @@ type Mutation {
     updateRequestStatus(input: UpdateRequestStatusInput!): Request!
 
     "Make an offer to carry a request. Only allowed if the status is OPEN and the request is visible to the auth user."
-    addMeAsPotentialProvider(requestID: String!): Request!
-    "Make an offer to carry a request. Only allowed if the status is OPEN and the post is visible to the auth user."
-    addMeAsPotentialProvider(input: PotentialProviderInput!): Post!
+    addMeAsPotentialProvider(input: PotentialProviderInput!): Request!
 
     "Cancel a carry offer by auth user. Authorized for the request creator, the potential provider, and Super Admins."
     removeMeAsPotentialProvider(requestID: String!): Request!
@@ -647,7 +645,7 @@ type Request {
     provider: PublicProfile
     "Users that have offered to carry this request."
     potentialProviders: [potentialProvider!]
-    "Organization associated with this post."
+    "Organization associated with this request."
     organization: Organization
     "Short description of item, limited to 255 characters"
     title: String!
@@ -750,10 +748,9 @@ input UpdateRequestInput {
     visibility: RequestVisibility
 }
 
-input UpdateRequestStatusInput {
-    "ID of the request to update"
+
 input PotentialProviderInput {
-    postID: String!
+    requestID: String!
     """
     Date (yyyy-mm-dd) after which the request can be fufilled (NOT inclusive).
     DeliveryAfter must come before deliveryBefore.
@@ -763,8 +760,8 @@ input PotentialProviderInput {
     deliveryBefore: String!
 }
 
-input UpdatePostStatusInput {
-    "ID of the post to update"
+input UpdateRequestStatusInput {
+    "ID of the request to update"
     id: ID!
     "New Status. Only a limited set of transitions are allowed."
     status: RequestStatus!

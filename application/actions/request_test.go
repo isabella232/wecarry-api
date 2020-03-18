@@ -27,9 +27,16 @@ type RequestResponse struct {
 	Request Request `json:"request"`
 }
 
+type PublicProfile struct {
+	ID        string `json:"id"`
+	Nickname  string `json:"nickname"`
+	AvatarURL string `json:"avatarURL"`
+}
+
 type PotentialProvider struct {
-	ID       string `json:"id"`
-	Nickname string `json:"nickname"`
+	User           PublicProfile `json:"user"`
+	DeliveryAfter  string        `json:"deliveryAfter"`
+	DeliveryBefore string        `json:"deliveryBefore"`
 }
 
 type Request struct {
@@ -88,7 +95,7 @@ const allRequestFields = `{
 			id
 			createdBy { id nickname avatarURL }
 			provider { id nickname avatarURL }
-            potentialProviders { id nickname avatarURL }
+            potentialProviders { user {id nickname avatarURL} deliveryAfter deliveryBefore}
 			organization { id }
 			title
 			description
@@ -490,7 +497,7 @@ func (as *ActionSuite) Test_UpdateRequestStatus_DestroyPotentialProviders() {
 
 	for _, step := range steps {
 		input := `id: "` + f.Posts[0].UUID.String() + `", status: ` + step.status.String()
-		query := `mutation { request: updateRequestStatus(input: {` + input + `}) {id status potentialProviders {id}}}`
+		query := `mutation { request: updateRequestStatus(input: {` + input + `}) {id status potentialProviders {user {nickname}}}}`
 
 		err := as.testGqlQuery(query, step.user.Nickname, &requestsResp)
 		if step.wantErr {
