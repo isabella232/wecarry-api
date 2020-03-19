@@ -43,17 +43,7 @@ func (as *ActionSuite) Test_AddMeAsPotentialProvider() {
 	as.Equal(posts[1].UUID.String(), resp.Request.ID, "incorrect Post UUID")
 	as.Equal(posts[1].Title, resp.Request.Title, "incorrect Post title")
 
-	ppros := f.PotentialProviders
-	deliveryAfter0 := ppros[0].DeliveryAfter.Format(domain.DateFormat)
-	deliveryBefore0 := ppros[0].DeliveryBefore.Format(domain.DateFormat)
-	deliveryAfter1 := ppros[1].DeliveryAfter.Format(domain.DateFormat)
-	deliveryBefore1 := ppros[1].DeliveryBefore.Format(domain.DateFormat)
-
 	want = []PotentialProvider{
-		{User: PublicProfile{ID: f.Users[2].UUID.String(), Nickname: f.Users[2].Nickname},
-			DeliveryAfter: deliveryAfter0, DeliveryBefore: deliveryBefore0},
-		{User: PublicProfile{ID: f.Users[3].UUID.String(), Nickname: f.Users[3].Nickname},
-			DeliveryAfter: deliveryAfter1, DeliveryBefore: deliveryBefore1},
 		{User: PublicProfile{ID: f.Users[1].UUID.String(), Nickname: f.Users[1].Nickname},
 			DeliveryAfter: deliveryAfter, DeliveryBefore: deliveryBefore},
 	}
@@ -66,10 +56,6 @@ func (as *ActionSuite) Test_AddMeAsPotentialProvider() {
 	as.Error(err, "expected an error (unique together) but didn't get one")
 
 	want = []PotentialProvider{
-		{User: PublicProfile{ID: f.Users[2].UUID.String(), Nickname: f.Users[2].Nickname},
-			DeliveryAfter: deliveryAfter0, DeliveryBefore: deliveryBefore0},
-		{User: PublicProfile{ID: f.Users[3].UUID.String(), Nickname: f.Users[3].Nickname},
-			DeliveryAfter: deliveryAfter1, DeliveryBefore: deliveryBefore1},
 		{User: PublicProfile{ID: f.Users[1].UUID.String(), Nickname: f.Users[1].Nickname},
 			DeliveryAfter: deliveryAfter, DeliveryBefore: deliveryBefore},
 	}
@@ -99,8 +85,7 @@ func (as *ActionSuite) Test_RemoveMeAsPotentialProvider() {
 	as.Equal(posts[1].UUID.String(), resp.Request.ID, "incorrect Post UUID")
 	as.Equal(posts[1].Title, resp.Request.Title, "incorrect Post title")
 
-	want := []PotentialProvider{
-		{User: PublicProfile{ID: f.Users[3].UUID.String(), Nickname: f.Users[3].Nickname}}}
+	want := []PotentialProvider{}
 	as.Equal(want, resp.Request.PotentialProviders, "incorrect potential providers")
 }
 
@@ -117,7 +102,8 @@ func (as *ActionSuite) Test_RemovePotentialProvider() {
 	// remove third User as a potential provider on second Post
 	query := fmt.Sprintf(qTemplate, posts[1].UUID.String(), f.Users[2].UUID.String())
 
-	err := as.testGqlQuery(query, f.Users[2].Nickname, &resp)
+	// Called by requester
+	err := as.testGqlQuery(query, f.Users[0].Nickname, &resp)
 	as.NoError(err)
 	as.Equal(posts[1].UUID.String(), resp.Request.ID, "incorrect Post UUID")
 	as.Equal(posts[1].Title, resp.Request.Title, "incorrect Post title")
