@@ -660,7 +660,7 @@ func (p *Post) GetPotentialProviderActions(currentUser User) ([]string, error) {
 	// User is not the Creator
 	for _, pp := range providers {
 		// If user is already one of the PotentiaProviders
-		if pp.ID == currentUser.ID {
+		if pp.UserID == currentUser.ID {
 			return []string{RequestActionRetractOffer}, nil
 		}
 	}
