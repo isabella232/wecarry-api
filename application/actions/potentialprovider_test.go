@@ -89,12 +89,12 @@ func (as *ActionSuite) Test_RemoveMeAsPotentialProvider() {
 	as.Equal(want, resp.Request.PotentialProviders, "incorrect potential providers")
 }
 
-func (as *ActionSuite) Test_RemovePotentialProvider() {
+func (as *ActionSuite) Test_RejectPotentialProvider() {
 
 	f := test.CreatePotentialProvidersFixtures(as.DB)
 	posts := f.Posts
 
-	const qTemplate = `mutation {request: removePotentialProvider (requestID: "%s", userID: "%s")` +
+	const qTemplate = `mutation {request: rejectPotentialProvider (requestID: "%s", userID: "%s")` +
 		` {id title potentialProviders{user{id nickname}}}}`
 
 	var resp RequestResponse
