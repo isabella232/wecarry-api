@@ -10,48 +10,48 @@ import (
 	"github.com/silinternational/wecarry-api/domain"
 )
 
-func (ms *ModelSuite) TestPotentialProviders_FindByPostID() {
+func (ms *ModelSuite) TestPotentialProviders_FindByRequestID() {
 	f := createPotentialProvidersFixtures(ms)
 	users := f.Users
 	users[3].AdminRole = UserAdminRoleSuperAdmin
 	ms.NoError(ms.DB.Save(&users[3]), "error making user fixture a SuperAdmin")
 
-	posts := f.Posts
+	requests := f.Requests
 	pps := f.PotentialProviders
 	t := ms.T()
 	tests := []struct {
 		name    string
-		post    Post
+		request Request
 		user    User
 		wantIDs []int
 	}{
 		{
 			name:    "requester as current user",
-			post:    posts[0],
+			request: requests[0],
 			user:    users[0],
 			wantIDs: []int{pps[0].ID, pps[1].ID, pps[2].ID},
 		},
 		{
 			name:    "potential provider as current user",
-			post:    posts[0],
+			request: requests[0],
 			user:    users[1],
 			wantIDs: []int{pps[0].ID},
 		},
 		{
 			name:    "current user is SuperAdmin",
-			post:    posts[0],
+			request: requests[0],
 			user:    users[3],
 			wantIDs: []int{pps[0].ID, pps[1].ID, pps[2].ID},
 		},
 		{
 			name:    "non potential provider as current user",
-			post:    posts[1],
+			request: requests[1],
 			user:    users[1],
 			wantIDs: []int{},
 		},
 		{
 			name:    "empty current user",
-			post:    posts[1],
+			request: requests[1],
 			user:    User{},
 			wantIDs: []int{pps[3].ID, pps[4].ID},
 		},
@@ -59,7 +59,7 @@ func (ms *ModelSuite) TestPotentialProviders_FindByPostID() {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			providers := PotentialProviders{}
-			err := providers.FindByPostID(tt.post, tt.user)
+			err := providers.FindByRequestID(tt.request, tt.user)
 			ms.NoError(err, "unexpected error")
 			ids := make([]int, len(providers))
 			for i, p := range providers {
@@ -71,37 +71,37 @@ func (ms *ModelSuite) TestPotentialProviders_FindByPostID() {
 	}
 }
 
-func (ms *ModelSuite) TestPotentialProvider_FindWithPostUUIDAndUserUUID() {
+func (ms *ModelSuite) TestPotentialProvider_FindWithRequestUUIDAndUserUUID() {
 	f := createPotentialProvidersFixtures(ms)
-	posts := f.Posts
+	requests := f.Requests
 	users := f.Users
 	pps := f.PotentialProviders
 	t := ms.T()
 	tests := []struct {
 		name        string
-		post        Post
+		request     Request
 		ppUserUUID  uuid.UUID
 		currentUser User
 		wantID      int
 		wantErr     string
 	}{
 		{
-			name:        "post Creator as current user",
-			post:        posts[0],
+			name:        "request Creator as current user",
+			request:     requests[0],
 			ppUserUUID:  users[1].UUID,
 			currentUser: users[1],
 			wantID:      pps[0].ID,
 		},
 		{
 			name:        "potential provider as current user",
-			post:        posts[0],
+			request:     requests[0],
 			ppUserUUID:  users[2].UUID,
 			currentUser: users[2],
 			wantID:      pps[1].ID,
 		},
 		{
 			name:        "current user is not potential provider",
-			post:        posts[1],
+			request:     requests[1],
 			ppUserUUID:  users[3].UUID,
 			currentUser: users[2],
 			wantID:      pps[4].ID,
@@ -111,7 +111,7 @@ func (ms *ModelSuite) TestPotentialProvider_FindWithPostUUIDAndUserUUID() {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			provider := PotentialProvider{}
-			err := provider.FindWithPostUUIDAndUserUUID(tt.post.UUID.String(),
+			err := provider.FindWithRequestUUIDAndUserUUID(tt.request.UUID.String(),
 				tt.ppUserUUID.String(), tt.currentUser)
 
 			if tt.wantErr != "" {
@@ -126,44 +126,44 @@ func (ms *ModelSuite) TestPotentialProvider_FindWithPostUUIDAndUserUUID() {
 	}
 }
 
-func (ms *ModelSuite) TestPotentialProviders_DestroyAllWithPostUUID() {
+func (ms *ModelSuite) TestPotentialProviders_DestroyAllWithRequestUUID() {
 	f := createPotentialProvidersFixtures(ms)
-	posts := f.Posts
+	requests := f.Requests
 	users := f.Users
 	pps := f.PotentialProviders
 	t := ms.T()
 	tests := []struct {
 		name        string
 		currentUser User
-		post        Post
+		request     Request
 		wantIDs     []int
 		wantErr     string
 	}{
 		{
-			name:        "good: Post Creator as current user",
+			name:        "good: Request Creator as current user",
 			currentUser: users[0],
-			post:        posts[0],
+			request:     requests[0],
 			wantIDs:     []int{pps[3].ID, pps[4].ID},
 		},
 		{
-			name:        "bad: current user is potential provider but not Post Creator",
+			name:        "bad: current user is potential provider but not Request Creator",
 			currentUser: users[2],
-			post:        posts[0],
-			wantErr: fmt.Sprintf(`user %v has insufficient permissions to destroy PotentialProviders for Post %v`,
-				users[2].ID, posts[0].ID),
+			request:     requests[0],
+			wantErr: fmt.Sprintf(`user %v has insufficient permissions to destroy PotentialProviders for Request %v`,
+				users[2].ID, requests[0].ID),
 		},
 		{
-			name:        "bad: current user is not Post Creator",
+			name:        "bad: current user is not Request Creator",
 			currentUser: users[1],
-			post:        posts[1],
-			wantErr: fmt.Sprintf(`user %v has insufficient permissions to destroy PotentialProviders for Post %v`,
-				users[1].ID, posts[1].ID),
+			request:     requests[1],
+			wantErr: fmt.Sprintf(`user %v has insufficient permissions to destroy PotentialProviders for Request %v`,
+				users[1].ID, requests[1].ID),
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			providers := PotentialProviders{}
-			err := providers.DestroyAllWithPostUUID(test.post.UUID.String(), test.currentUser)
+			err := providers.DestroyAllWithRequestUUID(test.request.UUID.String(), test.currentUser)
 
 			if test.wantErr != "" {
 				ms.Error(err, "did not get error as expected")
@@ -187,42 +187,42 @@ func (ms *ModelSuite) TestPotentialProviders_DestroyAllWithPostUUID() {
 	}
 }
 
-func (ms *ModelSuite) TestNewWithPostUUID() {
+func (ms *ModelSuite) TestNewWithRequestUUID() {
 	f := createPotentialProvidersFixtures(ms)
 	users := f.Users
-	posts := f.Posts
+	requests := f.Requests
 
 	t := ms.T()
 	tests := []struct {
 		name    string
-		post    Post
+		request Request
 		userID  int
 		wantIDs []int
 		wantErr string
 	}{
 		{
-			name:    "bad - using post's CreatedBy",
-			post:    posts[0],
+			name:    "bad - using request's CreatedBy",
+			request: requests[0],
 			userID:  users[0].ID,
-			wantErr: "PotentialProvider User must not be the Post's Receiver.",
+			wantErr: "PotentialProvider User must not be the Request's Receiver.",
 		},
 		{
-			name:   "good - second post second user",
-			post:   posts[1],
-			userID: users[1].ID,
+			name:    "good - second request second user",
+			request: requests[1],
+			userID:  users[1].ID,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			provider := PotentialProvider{}
-			err := provider.NewWithPostUUID(test.post.UUID.String(), test.userID)
+			err := provider.NewWithRequestUUID(test.request.UUID.String(), test.userID)
 			if test.wantErr != "" {
 				ms.Error(err, "expected an error but did not get one")
 				ms.Equal(test.wantErr, err.Error(), "incorrect error message")
 				return
 			}
 			ms.NoError(err, "unexpected error")
-			ms.Equal(test.post.ID, provider.PostID, "incorrect Post ID")
+			ms.Equal(test.request.ID, provider.RequestID, "incorrect Request ID")
 			ms.Equal(test.userID, provider.UserID, "incorrect User ID")
 		})
 	}
@@ -231,7 +231,7 @@ func (ms *ModelSuite) TestNewWithPostUUID() {
 func (ms *ModelSuite) TestPotentialProvider_Validate() {
 	f := createPotentialProvidersFixtures(ms)
 	users := f.Users
-	posts := f.Posts
+	requests := f.Requests
 
 	in1Week := time.Now().Add(domain.DurationWeek)
 	in2Weeks := in1Week.Add(domain.DurationWeek)
@@ -239,7 +239,7 @@ func (ms *ModelSuite) TestPotentialProvider_Validate() {
 	t := ms.T()
 	tests := []struct {
 		name           string
-		postID         int
+		requestID      int
 		userID         int
 		deliveryAfter  time.Time
 		deliveryBefore time.Time
@@ -247,8 +247,8 @@ func (ms *ModelSuite) TestPotentialProvider_Validate() {
 		wantErrs       map[string][]string
 	}{
 		{
-			name:           "good - second post second user",
-			postID:         posts[1].ID,
+			name:           "good - second request second user",
+			requestID:      requests[1].ID,
 			userID:         users[1].ID,
 			deliveryAfter:  in1Week,
 			deliveryBefore: in2Weeks,
@@ -256,7 +256,7 @@ func (ms *ModelSuite) TestPotentialProvider_Validate() {
 		},
 		{
 			name:           "bad - dates reversed",
-			postID:         posts[1].ID,
+			requestID:      requests[1].ID,
 			userID:         9,
 			deliveryAfter:  in2Weeks,
 			deliveryBefore: in1Week,
@@ -269,20 +269,20 @@ func (ms *ModelSuite) TestPotentialProvider_Validate() {
 		},
 		{
 			name:           "bad - duplicate",
-			postID:         posts[1].ID,
+			requestID:      requests[1].ID,
 			userID:         users[3].ID,
 			deliveryAfter:  in1Week,
 			deliveryBefore: in2Weeks,
 			wantErrs: map[string][]string{
 				"unique_together": {
-					fmt.Sprintf("Duplicate potential provider exists with PostID: %v and UserID: %v", posts[1].ID, users[3].ID)},
+					fmt.Sprintf("Duplicate potential provider exists with RequestID: %v and UserID: %v", requests[1].ID, users[3].ID)},
 			},
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			provider := PotentialProvider{
-				PostID:         test.postID,
+				RequestID:      test.requestID,
 				UserID:         test.userID,
 				DeliveryAfter:  test.deliveryAfter,
 				DeliveryBefore: test.deliveryBefore,
